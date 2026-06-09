@@ -1,0 +1,1574 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>스마트 체스 (AI & 2인 대전) - Ricejamjam</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* 드래그 및 터치 조작 최적화 */
+        .no-select {
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+        /* 스무스한 전환 효과 */
+        .transition-all-custom {
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        /* 컨테이너 쿼리를 활용한 완벽한 1:1 기물 크기 동적 대응 */
+        #board-container {
+            container-type: inline-size;
+            width: 100%;
+            /* 뷰포트 높이에 맞춤 설계하여 가로모드/세로모드 스크롤 완전 억제 */
+            max-width: min(100%, 78vh, 520px);
+            margin: 0 auto;
+        }
+        #chess-board {
+            display: grid !important;
+            grid-template-columns: repeat(8, minmax(0, 1fr)) !important;
+            grid-template-rows: repeat(8, minmax(0, 1fr)) !important;
+            width: 100% !important;
+            height: 100% !important;
+        }
+        /* 기물 폰트 크기를 보드 컨테이너 너비의 정확한 비율로 계산 */
+        .chess-piece-symbol {
+            font-size: 9.8cqw !important;
+            line-height: 1;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col no-select font-sans overflow-x-hidden relative">
+
+    <!-- 모바일 드로어 오픈 시 배경 어두워짐 레이어 -->
+    <div id="drawer-overlay" class="fixed inset-0 bg-black/60 z-30 opacity-0 pointer-events-none transition-opacity duration-300 lg:hidden"></div>
+
+    <!-- 헤더 -->
+    <header class="bg-slate-800 border-b border-slate-700 py-3 md:py-4 px-6 flex justify-between items-center shadow-lg shrink-0 z-20">
+        <div class="flex items-center gap-3">
+            <div class="bg-indigo-600 p-1.5 md:p-2 rounded-lg text-white">
+                <i data-lucide="crown" class="w-5 h-5 md:w-6 md:h-6"></i>
+            </div>
+            <h1 class="text-lg md:text-2xl font-black tracking-wider bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+                CHESS MIND
+            </h1>
+        </div>
+        <div class="flex gap-2">
+            <button id="btn-new-game" class="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-1.5 px-3 md:px-4 rounded-lg transition-all-custom text-xs md:text-sm shadow-md">
+                <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                <span>새 게임</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- 메인 레이아웃 -->
+    <main class="flex-1 flex flex-col lg:flex-row p-3 md:p-6 gap-6 max-w-7xl mx-auto w-full items-center lg:items-center justify-center relative overflow-hidden">
+        
+        <!-- 왼쪽: 게임 설정 패널 (모바일에서는 서랍장) -->
+        <div id="panel-settings" class="fixed inset-y-0 left-0 z-40 w-72 max-w-[80vw] transform -translate-x-full transition-transform duration-300 ease-in-out bg-slate-800 p-5 shadow-2xl border-r border-slate-700 lg:relative lg:inset-auto lg:translate-x-0 lg:shadow-none lg:border-none lg:p-0 lg:w-80 lg:flex lg:flex-col lg:gap-4 shrink-0">
+            
+            <!-- 모바일용 드로어 닫기 버튼 -->
+            <button id="btn-close-settings" class="lg:hidden absolute top-4 right-4 text-slate-400 hover:text-white">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+
+            <!-- 실제 카드 몸체 -->
+            <div class="bg-slate-800 lg:border lg:border-slate-700/80 p-4 rounded-2xl lg:shadow-xl w-full">
+                <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <i data-lucide="settings" class="w-4 h-4 text-indigo-400"></i> 게임 설정
+                </h2>
+                
+                <!-- 게임 모드 선택 -->
+                <div class="mb-4">
+                    <label class="block text-xs font-medium text-slate-400 mb-1.5">게임 모드</label>
+                    <div class="grid grid-cols-2 gap-2 bg-slate-900 p-1 rounded-xl">
+                        <button id="mode-vs-ai" class="py-2 px-3 rounded-lg text-xs font-bold transition-all-custom flex items-center justify-center gap-1.5 bg-indigo-600 text-white">
+                            <i data-lucide="cpu" class="w-3.5 h-3.5"></i> AI 대전
+                        </button>
+                        <button id="mode-vs-local" class="py-2 px-3 rounded-lg text-xs font-bold transition-all-custom flex items-center justify-center gap-1.5 text-slate-400 hover:text-white">
+                            <i data-lucide="users" class="w-3.5 h-3.5"></i> 2인 대전
+                        </button>
+                    </div>
+                </div>
+
+                <!-- AI 난이도 설정 -->
+                <div id="ai-difficulty-container" class="mb-4">
+                    <label class="block text-xs font-medium text-slate-400 mb-1.5">AI 난이도</label>
+                    <div class="grid grid-cols-3 gap-1 bg-slate-900 p-1 rounded-xl">
+                        <button data-level="1" class="difficulty-btn py-1.5 text-xs font-semibold rounded-lg transition-all-custom bg-slate-800 text-slate-300 hover:text-white">쉬움</button>
+                        <button data-level="2" class="difficulty-btn py-1.5 text-xs font-semibold rounded-lg transition-all-custom bg-indigo-600 text-white">보통</button>
+                        <button data-level="3" class="difficulty-btn py-1.5 text-xs font-semibold rounded-lg transition-all-custom bg-slate-800 text-slate-300 hover:text-white">어려움</button>
+                    </div>
+                </div>
+
+                <!-- 플레이어 색상 선택 -->
+                <div id="player-color-container" class="mb-2">
+                    <label class="block text-xs font-medium text-slate-400 mb-1.5">플레이어 색상</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button id="color-white" class="py-2 bg-white text-slate-900 font-bold rounded-lg text-[11px] border-2 border-indigo-500 flex items-center justify-center gap-1">
+                            <span class="w-2.5 h-2.5 bg-white border border-slate-400 rounded-full"></span> 백색 (선공)
+                        </button>
+                        <button id="color-black" class="py-2 bg-slate-950 text-white font-bold rounded-lg text-[11px] border-2 border-transparent hover:border-slate-700 flex items-center justify-center gap-1">
+                            <span class="w-2.5 h-2.5 bg-slate-950 border border-slate-600 rounded-full"></span> 흑색 (후공)
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 상태 및 정보 카드 (데스크톱 전용 바인딩 유지) -->
+            <div class="hidden lg:flex bg-slate-800 border border-slate-700/80 p-4 rounded-2xl shadow-xl flex-col justify-between min-h-[180px] w-full">
+                <div>
+                    <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <i data-lucide="info" class="w-4 h-4 text-indigo-400"></i> 경기 정보
+                    </h2>
+                    <div class="bg-slate-900 p-2.5 rounded-xl flex items-center justify-between mb-3 text-xs">
+                        <span class="text-slate-400">현재 차례</span>
+                        <div id="turn-badge-desktop" class="flex items-center gap-1.5 font-bold px-2 py-0.5 rounded-full bg-white text-slate-950">
+                            <span class="w-2 h-2 bg-white border border-slate-400 rounded-full inline-block"></span>
+                            <span>백색</span>
+                        </div>
+                    </div>
+                    <div id="status-message-desktop" class="text-center py-2 px-3 rounded-xl text-xs font-semibold bg-slate-900/50 text-slate-300">
+                        대국 준비 완료
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 가운데: 체스판 및 모바일 전용 토글러 -->
+        <div class="flex-1 flex flex-col items-center justify-center w-full max-w-[540px]">
+            
+            <!-- 상대방 정보 플레이트 -->
+            <div class="w-full flex justify-between items-center px-3 py-1.5 mb-2 bg-slate-800/40 rounded-xl border border-slate-700/50">
+                <div class="flex items-center gap-2">
+                    <div id="opponent-avatar" class="w-7 h-7 rounded-lg bg-purple-600/20 text-purple-400 flex items-center justify-center font-bold text-xs">
+                        <i data-lucide="cpu" class="w-4 h-4"></i>
+                    </div>
+                    <div>
+                        <div id="opponent-name" class="text-xs font-bold text-slate-200 leading-tight">인공지능 (Lv.2 보통)</div>
+                        <div id="opponent-captured" class="flex items-center gap-0.5 text-[10px] text-slate-400 h-3"></div>
+                    </div>
+                </div>
+                <div id="opponent-timer" class="text-xs font-mono bg-slate-900 px-2 py-0.5 rounded text-slate-400">--:--</div>
+            </div>
+
+            <!-- 모바일 전용 상단 서랍 토글 액션 바 (화면이 작을 때만 등장) -->
+            <div class="flex lg:hidden w-full gap-2 mb-2">
+                <button id="btn-toggle-settings" class="flex-1 py-2 px-3 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border border-slate-700/80 transition-all-custom">
+                    <i data-lucide="settings" class="w-3.5 h-3.5 text-indigo-400"></i>설정 변경
+                </button>
+                <button id="btn-toggle-pgn" class="flex-1 py-2 px-3 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border border-slate-700/80 transition-all-custom">
+                    <i data-lucide="scroll-text" class="w-3.5 h-3.5 text-indigo-400"></i>기보 기록
+                </button>
+            </div>
+
+            <!-- 체스판 외곽 박스 및 동적 종횡비 컨테이너 -->
+            <div id="board-container" class="relative aspect-square bg-slate-950 p-2 md:p-3 rounded-2xl md:rounded-3xl shadow-2xl border-2 md:border-4 border-slate-800">
+                <div id="chess-board" class="rounded-lg overflow-hidden touch-none relative">
+                    <!-- 자바스크립트로 체스판 격자와 기물을 실시간 배치합니다. -->
+                </div>
+
+                <!-- 폰 승진(Promotion) 팝업 모달 -->
+                <div id="promotion-overlay" class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm rounded-xl flex items-center justify-center hidden z-50">
+                    <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700 max-w-[260px] text-center shadow-2xl">
+                        <p class="text-xs font-bold text-slate-200 mb-3">프로모션 기물 선택</p>
+                        <div class="grid grid-cols-4 gap-2">
+                            <button data-promo="q" class="promo-choice-btn p-2 bg-slate-700 hover:bg-slate-600 rounded-xl flex flex-col items-center">
+                                <span class="text-2xl text-white">♛</span>
+                                <span class="text-[9px] mt-1 text-slate-300">퀸</span>
+                            </button>
+                            <button data-promo="r" class="promo-choice-btn p-2 bg-slate-700 hover:bg-slate-600 rounded-xl flex flex-col items-center">
+                                <span class="text-2xl text-white">♜</span>
+                                <span class="text-[9px] mt-1 text-slate-300">룩</span>
+                            </button>
+                            <button data-promo="b" class="promo-choice-btn p-2 bg-slate-700 hover:bg-slate-600 rounded-xl flex flex-col items-center">
+                                <span class="text-2xl text-white">♝</span>
+                                <span class="text-[9px] mt-1 text-slate-300">비숍</span>
+                            </button>
+                            <button data-promo="n" class="promo-choice-btn p-2 bg-slate-700 hover:bg-slate-600 rounded-xl flex flex-col items-center">
+                                <span class="text-2xl text-white">♞</span>
+                                <span class="text-[9px] mt-1 text-slate-300">나이트</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 내 정보 플레이트 및 턴 가이드 정보 통합 배치 -->
+            <div class="w-full flex justify-between items-center px-3 py-1.5 mt-2 bg-slate-800/40 rounded-xl border border-slate-700/50">
+                <div class="flex items-center gap-2">
+                    <div class="w-7 h-7 rounded-lg bg-indigo-600/20 text-indigo-400 flex items-center justify-center font-bold text-xs">
+                        <i data-lucide="user" class="w-4 h-4"></i>
+                    </div>
+                    <div>
+                        <div id="player-name" class="text-xs font-bold text-slate-200 leading-tight">플레이어 (나)</div>
+                        <div id="player-captured" class="flex items-center gap-0.5 text-[10px] text-slate-400 h-3"></div>
+                    </div>
+                </div>
+                <div id="player-timer" class="text-xs font-mono bg-slate-900 px-2 py-0.5 rounded text-slate-400">--:--</div>
+            </div>
+
+            <!-- 모바일/공통 하단 퀵 액션 컨트롤러 -->
+            <div class="grid grid-cols-3 gap-2 w-full mt-3">
+                <button id="btn-undo" class="flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 font-bold py-2.5 px-2 rounded-xl border border-slate-700/50 transition-all-custom text-xs">
+                    <i data-lucide="undo-2" class="w-3.5 h-3.5 text-indigo-400"></i> 한수 무르기
+                </button>
+                <button id="btn-flip" class="flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2.5 px-2 rounded-xl border border-slate-700/50 transition-all-custom text-xs">
+                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-indigo-400"></i> 판 뒤집기
+                </button>
+                <!-- 모바일 실시간 턴 인포 알림 -->
+                <div id="turn-badge-mobile" class="lg:hidden flex items-center justify-center gap-1 px-1 bg-slate-950/80 rounded-xl text-[10px] font-black tracking-tight text-white border border-slate-800">
+                    <span class="w-2 h-2 bg-white rounded-full inline-block"></span>
+                    <span id="turn-badge-mobile-text">백색 차례</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 오른쪽: 이동 기록 기보 대시보드 (모바일에서는 서랍장) -->
+        <div id="panel-pgn" class="fixed inset-y-0 right-0 z-40 w-72 max-w-[80vw] transform translate-x-full transition-transform duration-300 ease-in-out bg-slate-800 p-5 shadow-2xl border-l border-slate-700 lg:relative lg:inset-auto lg:translate-x-0 lg:shadow-none lg:border-none lg:p-0 lg:w-64 lg:flex lg:flex-col lg:h-[520px]">
+            
+            <!-- 모바일용 드로어 닫기 버튼 -->
+            <button id="btn-close-pgn" class="lg:hidden absolute top-4 left-4 text-slate-400 hover:text-white">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+
+            <!-- 실제 기보 내부 몸체 -->
+            <div class="h-full flex flex-col justify-between">
+                <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2 mt-4 lg:mt-0">
+                    <i data-lucide="scroll-text" class="w-4 h-4 text-indigo-400"></i> 대국 기록 (PGN)
+                </h2>
+                <div id="pgn-scroll-container" class="flex-1 overflow-y-auto bg-slate-900 rounded-xl p-3 text-xs font-mono text-slate-300 min-h-[220px]">
+                    <div id="pgn-list" class="grid grid-cols-2 gap-y-1 gap-x-4"></div>
+                    <div id="pgn-empty" class="text-slate-500 text-center py-12">
+                        기록이 존재하지 않습니다.
+                    </div>
+                </div>
+                <div class="hidden lg:block mt-3 text-[10px] text-slate-500 text-center leading-relaxed">
+                    터치 시 이동 궤적이 가이드됩니다.
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 커스텀 알림/종료 모달 -->
+    <div id="game-over-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-slate-800 p-6 md:p-8 rounded-3xl border-2 border-indigo-500/50 max-w-sm w-full text-center shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div class="w-14 h-16 bg-indigo-600/20 text-indigo-400 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i data-lucide="trophy" class="w-8 h-8"></i>
+            </div>
+            <h3 id="modal-title" class="text-xl font-bold text-white mb-2">게임 종료</h3>
+            <p id="modal-desc" class="text-sm text-slate-300 mb-6">체크메이트로 승부 결정!</p>
+            <div class="flex flex-col gap-2">
+                <button id="modal-btn-restart" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-sm transition-all-custom">
+                    다시 대국하기
+                </button>
+                <button id="modal-btn-close" class="w-full py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold rounded-xl text-sm transition-all-custom">
+                    닫기
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 푸터 -->
+    <footer class="bg-slate-950 text-slate-500 text-xs text-center py-4 border-t border-slate-800 shrink-0">
+        <p>© 2026 Ricejamjam 스튜디오. All rights reserved.</p>
+    </footer>
+
+    <!-- 체스 프로그램 로직 -->
+    <script>
+        function safeCreateIcons() {
+            try {
+                if (typeof lucide !== 'undefined' && lucide.createIcons) {
+                    lucide.createIcons();
+                }
+            } catch (e) {
+                console.warn('Lucide icon rendering skipped:', e);
+            }
+        }
+
+        // --- 1. 유니코드 체스 기물 매핑 (렌더링용) ---
+        const PIECE_UNICODE = {
+            'w_p': '♟', 'w_r': '♜', 'w_n': '♞', 'w_b': '♝', 'w_q': '♛', 'w_k': '♚',
+            'b_p': '♟', 'b_r': '♜', 'b_n': '♞', 'b_b': '♝', 'b_q': '♛', 'b_k': '♚'
+        };
+
+        const PIECE_COLOR_CLASS = {
+            'w': 'text-amber-100 drop-shadow-[0_2px_3px_rgba(0,0,0,0.8)] font-bold',
+            'b': 'text-slate-950 drop-shadow-[0_1px_1px_rgba(255,255,255,0.4)] font-bold'
+        };
+
+        // --- 2. 체스 평가 가중치 (PST: Piece-Square Tables) for AI ---
+        const PAWN_PST = [
+            [0,  0,  0,  0,  0,  0,  0,  0],
+            [50, 50, 50, 50, 50, 50, 50, 50],
+            [10, 10, 20, 30, 30, 20, 10, 10],
+            [5,  5, 10, 25, 25, 10,  5,  5],
+            [0,  0,  0, 20, 20,  0,  0,  0],
+            [5, -5,-10,  0,  0,-10, -5,  5],
+            [5, 10, 10,-20,-20, 10, 10,  5],
+            [0,  0,  0,  0,  0,  0,  0,  0]
+        ];
+
+        const KNIGHT_PST = [
+            [-50,-40,-30,-30,-30,-30,-40,-50],
+            [-40,-20,  0,  0,  0,  0,-20,-40],
+            [-30,  0, 10, 15, 15, 10,  0,-30],
+            [-30,  5, 15, 20, 20, 15,  5,-30],
+            [-30,  0, 15, 20, 20, 15,  0,-30],
+            [-30,  5, 10, 15, 15, 10,  5,-30],
+            [-40,-20,  0,  5,  5,  0,-20,-40],
+            [-50,-40,-30,-30,-30,-30,-40,-50]
+        ];
+
+        const BISHOP_PST = [
+            [-20,-10,-10,-10,-10,-10,-10,-20],
+            [-10,  0,  0,  0,  0,  0,  0,-10],
+            [-10,  0,  5, 10, 10,  5,  0,-10],
+            [-10,  5,  5, 10, 10,  5,  5,-10],
+            [-10,  0, 10, 10, 10, 10,  0,-10],
+            [-10, 10, 10, 10, 10, 10, 10,-10],
+            [-10,  5,  0,  0,  0,  0,  5,-10],
+            [-20,-10,-10,-10,-10,-10,-10,-20]
+        ];
+
+        const ROOK_PST = [
+            [0,  0,  0,  0,  0,  0,  0,  0],
+            [5, 10, 10, 10, 10, 10, 10,  5],
+            [-5,  0,  0,  0,  0,  0,  0, -5],
+            [-5,  0,  0,  0,  0,  0,  0, -5],
+            [-5,  0,  0,  0,  0,  0,  0, -5],
+            [-5,  0,  0,  0,  0,  0,  0, -5],
+            [-5,  0,  0,  0,  0,  0,  0, -5],
+            [0,  0,  0,  5,  5,  0,  0,  0]
+        ];
+
+        const QUEEN_PST = [
+            [-20,-10,-10, -5, -5,-10,-10,-20],
+            [-10,  0,  0,  0,  0,  0,  0,-10],
+            [-10,  0,  5,  5,  5,  5,  0,-10],
+            [-5,  0,  5,  5,  5,  5,  0, -5],
+            [0,  0,  5,  5,  5,  5,  0, -5],
+            [-10,  5,  5,  5,  5,  5,  0,-10],
+            [-10,  0,  5,  0,  0,  5,  0,-10],
+            [-20,-10,-10, -5, -5,-10,-10,-20]
+        ];
+
+        const KING_MIDGAME_PST = [
+            [-30,-40,-40,-50,-50,-40,-40,-30],
+            [-30,-40,-40,-50,-50,-40,-40,-30],
+            [-30,-40,-40,-50,-50,-40,-40,-30],
+            [-30,-40,-40,-50,-50,-40,-40,-30],
+            [-20,-30,-30,-40,-40,-30,-30,-20],
+            [-10,-20,-20,-20,-20,-20,-20,-10],
+            [20, 20,  0,  0,  0,  0, 20, 20],
+            [20, 30, 10,  0,  0, 10, 30, 20]
+        ];
+
+        // --- 3. 체스 상태 관리 엔진 ---
+        class ChessEngine {
+            constructor() {
+                this.reset();
+            }
+
+            reset() {
+                this.board = Array(8).fill(null).map(() => Array(8).fill(null));
+                this.turn = 'w';
+                this.moveHistory = [];
+                
+                this.castleRights = {
+                    w: { kingSide: true, queenSide: true },
+                    b: { kingSide: true, queenSide: true }
+                };
+                
+                this.enPassantTarget = null;
+                this.halfMoveClock = 0;
+                this.fullMoveNumber = 1;
+
+                this.capturedPieces = { w: [], b: [] };
+                this.setupStandardBoard();
+            }
+
+            setupStandardBoard() {
+                const backRow = ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'];
+                for (let c = 0; c < 8; c++) {
+                    this.board[0][c] = { type: backRow[c], color: 'b' };
+                    this.board[1][c] = { type: 'p', color: 'b' };
+                    
+                    this.board[6][c] = { type: 'p', color: 'w' };
+                    this.board[7][c] = { type: backRow[c], color: 'w' };
+                }
+            }
+
+            clone() {
+                const cloneEngine = new ChessEngine();
+                cloneEngine.board = this.board.map(row => row.map(cell => cell ? { ...cell } : null));
+                cloneEngine.turn = this.turn;
+                cloneEngine.castleRights = {
+                    w: { ...this.castleRights.w },
+                    b: { ...this.castleRights.b }
+                };
+                cloneEngine.enPassantTarget = this.enPassantTarget ? { ...this.enPassantTarget } : null;
+                cloneEngine.halfMoveClock = this.halfMoveClock;
+                cloneEngine.fullMoveNumber = this.fullMoveNumber;
+                cloneEngine.capturedPieces = {
+                    w: [...this.capturedPieces.w],
+                    b: [...this.capturedPieces.b]
+                };
+                return cloneEngine;
+            }
+
+            getPiece(r, c) {
+                if (r < 0 || r > 7 || c < 0 || c > 7) return null;
+                return this.board[r][c];
+            }
+
+            setPiece(r, c, piece) {
+                this.board[r][c] = piece;
+            }
+
+            getPseudoLegalMoves(r, c) {
+                const piece = this.getPiece(r, c);
+                if (!piece) return [];
+
+                let moves = [];
+                const color = piece.color;
+                const oppColor = color === 'w' ? 'b' : 'w';
+
+                switch (piece.type) {
+                    case 'p': {
+                        const dir = color === 'w' ? -1 : 1;
+                        const startRow = color === 'w' ? 6 : 1;
+
+                        if (!this.getPiece(r + dir, c)) {
+                            moves.push({ from: { r, c }, to: { r: r + dir, c } });
+                            if (r === startRow && !this.getPiece(r + dir * 2, c)) {
+                                moves.push({ from: { r, c }, to: { r: r + dir * 2, c } });
+                            }
+                        }
+
+                        const captureOffsets = [-1, 1];
+                        for (let dc of captureOffsets) {
+                            const target = this.getPiece(r + dir, c + dc);
+                            if (target && target.color === oppColor) {
+                                moves.push({ from: { r, c }, to: { r: r + dir, c: c + dc } });
+                            }
+                            if (this.enPassantTarget && this.enPassantTarget.r === r + dir && this.enPassantTarget.c === c + dc) {
+                                moves.push({ from: { r, c }, to: { r: r + dir, c: c + dc }, isEnPassant: true });
+                            }
+                        }
+                        break;
+                    }
+                    case 'n': {
+                        const offsets = [
+                            [-2, -1], [-2, 1], [-1, -2], [-1, 2],
+                            [1, -2], [1, 2], [2, -1], [2, 1]
+                        ];
+                        for (let [dr, dc] of offsets) {
+                            const tr = r + dr;
+                            const tc = c + dc;
+                            const target = this.getPiece(tr, tc);
+                            if (tr >= 0 && tr < 8 && tc >= 0 && tc < 8) {
+                                if (!target || target.color === oppColor) {
+                                    moves.push({ from: { r, c }, to: { r: tr, c: tc } });
+                                }
+                            }
+                        }
+                        break;
+                    }
+                    case 'b':
+                        moves = moves.concat(this.getSlidingMoves(r, c, [[-1, -1], [-1, 1], [1, -1], [1, 1]]));
+                        break;
+                    case 'r':
+                        moves = moves.concat(this.getSlidingMoves(r, c, [[-1, 0], [1, 0], [0, -1], [0, 1]]));
+                        break;
+                    case 'q':
+                        moves = moves.concat(this.getSlidingMoves(r, c, [
+                            [-1, -1], [-1, 1], [1, -1], [1, 1],
+                            [-1, 0], [1, 0], [0, -1], [0, 1]
+                        ]));
+                        break;
+                    case 'k': {
+                        const offsets = [
+                            [-1, -1], [-1, 0], [-1, 1],
+                            [0, -1],           [0, 1],
+                            [1, -1],  [1, 0],  [1, 1]
+                        ];
+                        for (let [dr, dc] of offsets) {
+                            const tr = r + dr;
+                            const tc = c + dc;
+                            const target = this.getPiece(tr, tc);
+                            if (tr >= 0 && tr < 8 && tc >= 0 && tc < 8) {
+                                if (!target || target.color === oppColor) {
+                                    moves.push({ from: { r, c }, to: { r: tr, c: tc } });
+                                }
+                            }
+                        }
+                        moves = moves.concat(this.getCastleMoves(r, c));
+                        break;
+                    }
+                }
+
+                return moves;
+            }
+
+            getSlidingMoves(r, c, directions) {
+                const moves = [];
+                const piece = this.getPiece(r, c);
+                const oppColor = piece.color === 'w' ? 'b' : 'w';
+
+                for (let [dr, dc] of directions) {
+                    let tr = r + dr;
+                    let tc = c + dc;
+                    while (tr >= 0 && tr < 8 && tc >= 0 && tc < 8) {
+                        const target = this.getPiece(tr, tc);
+                        if (!target) {
+                            moves.push({ from: { r, c }, to: { r: tr, c: tc } });
+                        } else {
+                            if (target.color === oppColor) {
+                                moves.push({ from: { r, c }, to: { r: tr, c: tc } });
+                            }
+                            break;
+                        }
+                        tr += dr;
+                        tc += dc;
+                    }
+                }
+                return moves;
+            }
+
+            getCastleMoves(r, c) {
+                const moves = [];
+                const piece = this.getPiece(r, c);
+                const color = piece.color;
+                const rights = this.castleRights[color];
+                if (!rights.kingSide && !rights.queenSide) return [];
+                if (this.isInCheck(color)) return [];
+
+                if (rights.kingSide) {
+                    const c1 = this.getPiece(r, 5);
+                    const c2 = this.getPiece(r, 6);
+                    if (!c1 && !c2) {
+                        if (!this.isSquareAttacked(r, 5, color) && !this.isSquareAttacked(r, 6, color)) {
+                            moves.push({ from: { r, c }, to: { r, c: 6 }, isCastle: 'k' });
+                        }
+                    }
+                }
+
+                if (rights.queenSide) {
+                    const c1 = this.getPiece(r, 3);
+                    const c2 = this.getPiece(r, 2);
+                    const c3 = this.getPiece(r, 1);
+                    if (!c1 && !c2 && !c3) {
+                        if (!this.isSquareAttacked(r, 3, color) && !this.isSquareAttacked(r, 2, color)) {
+                            moves.push({ from: { r, c }, to: { r, c: 2 }, isCastle: 'q' });
+                        }
+                    }
+                }
+
+                return moves;
+            }
+
+            isSquareAttacked(r, c, myColor) {
+                const oppColor = myColor === 'w' ? 'b' : 'w';
+                for (let tr = 0; tr < 8; tr++) {
+                    for (let tc = 0; tc < 8; tc++) {
+                        const piece = this.getPiece(tr, tc);
+                        if (piece && piece.color === oppColor) {
+                            if (piece.type === 'p') {
+                                const dir = oppColor === 'w' ? -1 : 1;
+                                if (tr + dir === r && (tc - 1 === c || tc + 1 === c)) {
+                                    return true;
+                                }
+                            } else if (piece.type === 'k') {
+                                const dr = Math.abs(tr - r);
+                                const dc = Math.abs(tc - c);
+                                if (dr <= 1 && dc <= 1) return true;
+                            } else {
+                                const moves = this.getPseudoLegalMoves(tr, tc);
+                                if (moves.some(m => m.to.r === r && m.to.c === c)) {
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+                return false;
+            }
+
+            findKing(color) {
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        const piece = this.getPiece(r, c);
+                        if (piece && piece.type === 'k' && piece.color === color) {
+                            return { r, c };
+                        }
+                    }
+                }
+                return null;
+            }
+
+            isInCheck(color) {
+                const kingPos = this.findKing(color);
+                if (!kingPos) return false;
+                return this.isSquareAttacked(kingPos.r, kingPos.c, color);
+            }
+
+            getLegalMoves(r, c) {
+                const piece = this.getPiece(r, c);
+                if (!piece || piece.color !== this.turn) return [];
+
+                const pseudoMoves = this.getPseudoLegalMoves(r, c);
+                const legalMoves = [];
+
+                for (let move of pseudoMoves) {
+                    const tempEngine = this.clone();
+                    tempEngine.executeMove(move, 'q', true);
+                    if (!tempEngine.isInCheck(this.turn)) {
+                        legalMoves.push(move);
+                    }
+                }
+
+                return legalMoves;
+            }
+
+            getAllLegalMoves() {
+                const allMoves = [];
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        const piece = this.getPiece(r, c);
+                        if (piece && piece.color === this.turn) {
+                            allMoves.push(...this.getLegalMoves(r, c));
+                        }
+                    }
+                }
+                return allMoves;
+            }
+
+            executeMove(move, promotionType = 'q', isVirtual = false) {
+                const { from, to } = move;
+                const piece = this.getPiece(from.r, from.c);
+                const captured = this.getPiece(to.r, to.c);
+                
+                const stateSnapshot = {
+                    move,
+                    piece: { ...piece },
+                    captured: captured ? { ...captured } : null,
+                    castleRights: {
+                        w: { ...this.castleRights.w },
+                        b: { ...this.castleRights.b }
+                    },
+                    enPassantTarget: this.enPassantTarget ? { ...this.enPassantTarget } : null,
+                    halfMoveClock: this.halfMoveClock,
+                    fullMoveNumber: this.fullMoveNumber
+                };
+
+                let isEnPassantCaptured = false;
+                if (move.isEnPassant) {
+                    const dir = piece.color === 'w' ? 1 : -1;
+                    const epCapturedPiece = this.getPiece(to.r + dir, to.c);
+                    stateSnapshot.captured = epCapturedPiece ? { ...epCapturedPiece } : null;
+                    this.setPiece(to.r + dir, to.c, null);
+                    isEnPassantCaptured = true;
+                }
+
+                this.setPiece(to.r, to.c, piece);
+                this.setPiece(from.r, from.c, null);
+
+                if (!isVirtual) {
+                    if (captured) {
+                        this.capturedPieces[piece.color].push(captured.type);
+                    } else if (isEnPassantCaptured && stateSnapshot.captured) {
+                        this.capturedPieces[piece.color].push(stateSnapshot.captured.type);
+                    }
+                }
+
+                if (piece.type === 'p' && (to.r === 0 || to.r === 7)) {
+                    this.setPiece(to.r, to.c, { type: promotionType, color: piece.color });
+                    stateSnapshot.isPromotion = true;
+                }
+
+                if (move.isCastle) {
+                    const row = piece.color === 'w' ? 7 : 0;
+                    if (move.isCastle === 'k') {
+                        const rook = this.getPiece(row, 7);
+                        this.setPiece(row, 5, rook);
+                        this.setPiece(row, 7, null);
+                    } else if (move.isCastle === 'q') {
+                        const rook = this.getPiece(row, 0);
+                        this.setPiece(row, 3, rook);
+                        this.setPiece(row, 0, null);
+                    }
+                }
+
+                if (piece.type === 'k') {
+                    this.castleRights[piece.color].kingSide = false;
+                    this.castleRights[piece.color].queenSide = false;
+                }
+                if (piece.type === 'r') {
+                    if (from.r === (piece.color === 'w' ? 7 : 0)) {
+                        if (from.c === 7) this.castleRights[piece.color].kingSide = false;
+                        if (from.c === 0) this.castleRights[piece.color].queenSide = false;
+                    }
+                }
+                if (captured && captured.type === 'r') {
+                    const oppColor = piece.color === 'w' ? 'b' : 'w';
+                    const oppRookRow = oppColor === 'w' ? 7 : 0;
+                    if (to.r === oppRookRow) {
+                        if (to.c === 7) this.castleRights[oppColor].kingSide = false;
+                        if (to.c === 0) this.castleRights[oppColor].queenSide = false;
+                    }
+                }
+
+                if (piece.type === 'p' && Math.abs(to.r - from.r) === 2) {
+                    const midRow = (from.r + to.r) / 2;
+                    this.enPassantTarget = { r: midRow, c: from.c };
+                } else {
+                    this.enPassantTarget = null;
+                }
+
+                if (piece.type === 'p' || captured) {
+                    this.halfMoveClock = 0;
+                } else {
+                    this.halfMoveClock++;
+                }
+
+                if (this.turn === 'b') {
+                    this.fullMoveNumber++;
+                }
+
+                this.turn = this.turn === 'w' ? 'b' : 'w';
+                this.moveHistory.push(stateSnapshot);
+            }
+
+            undo() {
+                if (this.moveHistory.length === 0) return false;
+
+                const lastState = this.moveHistory.pop();
+                const { move, piece, captured } = lastState;
+                const { from, to } = move;
+
+                this.turn = this.turn === 'w' ? 'b' : 'w';
+                this.setPiece(from.r, from.c, piece);
+                this.setPiece(to.r, to.c, captured);
+
+                if (move.isEnPassant) {
+                    const dir = this.turn === 'w' ? 1 : -1;
+                    this.setPiece(to.r + dir, to.c, captured);
+                    this.setPiece(to.r, to.c, null);
+                }
+
+                if (captured || move.isEnPassant) {
+                    const pList = this.capturedPieces[this.turn];
+                    if (pList.length > 0) pList.pop();
+                }
+
+                if (move.isCastle) {
+                    const row = this.turn === 'w' ? 7 : 0;
+                    if (move.isCastle === 'k') {
+                        const rook = this.getPiece(row, 5);
+                        this.setPiece(row, 7, rook);
+                        this.setPiece(row, 5, null);
+                    } else if (move.isCastle === 'q') {
+                        const rook = this.getPiece(row, 3);
+                        this.setPiece(row, 0, rook);
+                        this.setPiece(row, 3, null);
+                    }
+                }
+
+                this.castleRights = lastState.castleRights;
+                this.enPassantTarget = lastState.enPassantTarget;
+                this.halfMoveClock = lastState.halfMoveClock;
+                this.fullMoveNumber = lastState.fullMoveNumber;
+
+                return true;
+            }
+
+            getGameResult() {
+                const legalMoves = this.getAllLegalMoves();
+                const isCheck = this.isInCheck(this.turn);
+
+                if (legalMoves.length === 0) {
+                    if (isCheck) {
+                        return { status: 'checkmate', winner: this.turn === 'w' ? 'b' : 'w' };
+                    } else {
+                        return { status: 'stalemate', winner: null };
+                    }
+                }
+
+                if (this.isInsufficientMaterial()) {
+                    return { status: 'insufficient', winner: null };
+                }
+
+                if (this.halfMoveClock >= 100) {
+                    return { status: '50moves', winner: null };
+                }
+
+                return null;
+            }
+
+            isInsufficientMaterial() {
+                let wPieces = [];
+                let bPieces = [];
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        const p = this.getPiece(r, c);
+                        if (p) {
+                            if (p.color === 'w') wPieces.push(p.type);
+                            else bPieces.push(p.type);
+                        }
+                    }
+                }
+
+                if (wPieces.length === 1 && bPieces.length === 1) return true;
+
+                if (wPieces.length === 1 && bPieces.length === 2) {
+                    if (bPieces.includes('b') || bPieces.includes('n')) return true;
+                }
+                if (bPieces.length === 1 && wPieces.length === 2) {
+                    if (wPieces.includes('b') || wPieces.includes('n')) return true;
+                }
+
+                if (wPieces.length === 2 && bPieces.length === 2) {
+                    if (wPieces.includes('b') && bPieces.includes('b')) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
+
+        // --- 4. AI 에이전트 구현 (Minimax + Alpha Beta + Piece-Square Tables) ---
+        class ChessAI {
+            constructor(engine, difficulty = 2) {
+                this.engine = engine;
+                this.difficulty = difficulty;
+                
+                this.pieceValues = {
+                    'p': 100,
+                    'n': 320,
+                    'b': 330,
+                    'r': 500,
+                    'q': 900,
+                    'k': 20000
+                };
+            }
+
+            setDifficulty(difficulty) {
+                this.difficulty = parseInt(difficulty);
+            }
+
+            getBestMove() {
+                const legalMoves = this.engine.getAllLegalMoves();
+                if (legalMoves.length === 0) return null;
+
+                if (this.difficulty === 1 && Math.random() < 0.35) {
+                    return legalMoves[Math.floor(Math.random() * legalMoves.length)];
+                }
+
+                const depth = this.difficulty === 3 ? 3 : 2;
+                
+                let bestScore = -Infinity;
+                let bestMoves = [];
+
+                let alpha = -Infinity;
+                let beta = Infinity;
+
+                for (let move of legalMoves) {
+                    const tempBoard = this.engine.clone();
+                    tempBoard.executeMove(move, 'q', true);
+
+                    const score = -this.minimax(tempBoard, depth - 1, -beta, -alpha, tempBoard.turn === 'w');
+                    
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestMoves = [move];
+                    } else if (score === bestScore) {
+                        bestMoves.push(move);
+                    }
+
+                    alpha = Math.max(alpha, score);
+                    if (alpha >= beta) break;
+                }
+
+                return bestMoves[Math.floor(Math.random() * bestMoves.length)];
+            }
+
+            minimax(engine, depth, alpha, beta, isMaximizing) {
+                if (depth === 0) {
+                    return this.evaluateBoard(engine);
+                }
+
+                const legalMoves = engine.getAllLegalMoves();
+                if (legalMoves.length === 0) {
+                    const isCheck = engine.isInCheck(engine.turn);
+                    if (isCheck) {
+                        return -25000 - depth;
+                    } else {
+                        return 0;
+                    }
+                }
+
+                let maxScore = -Infinity;
+
+                for (let move of legalMoves) {
+                    const temp = engine.clone();
+                    temp.executeMove(move, 'q', true);
+                    
+                    const score = -this.minimax(temp, depth - 1, -beta, -alpha, !isMaximizing);
+                    maxScore = Math.max(maxScore, score);
+                    alpha = Math.max(alpha, score);
+                    if (alpha >= beta) {
+                        break;
+                    }
+                }
+
+                return maxScore;
+            }
+
+            evaluateBoard(engine) {
+                let score = 0;
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        const piece = engine.getPiece(r, c);
+                        if (piece) {
+                            let val = this.pieceValues[piece.type];
+                            let pSqBonus = 0;
+
+                            switch (piece.type) {
+                                case 'p':
+                                    pSqBonus = piece.color === 'w' ? PAWN_PST[r][c] : PAWN_PST[7 - r][c];
+                                    break;
+                                case 'n':
+                                    pSqBonus = piece.color === 'w' ? KNIGHT_PST[r][c] : KNIGHT_PST[7 - r][c];
+                                    break;
+                                case 'b':
+                                    pSqBonus = piece.color === 'w' ? BISHOP_PST[r][c] : BISHOP_PST[7 - r][c];
+                                    break;
+                                case 'r':
+                                    pSqBonus = piece.color === 'w' ? ROOK_PST[r][c] : ROOK_PST[7 - r][c];
+                                    break;
+                                case 'q':
+                                    pSqBonus = piece.color === 'w' ? QUEEN_PST[r][c] : QUEEN_PST[7 - r][c];
+                                    break;
+                                case 'k':
+                                    pSqBonus = piece.color === 'w' ? KING_MIDGAME_PST[r][c] : KING_MIDGAME_PST[7 - r][c];
+                                    break;
+                            }
+
+                            const totalPieceValue = val + pSqBonus;
+                            if (piece.color === 'w') {
+                                score += totalPieceValue;
+                            } else {
+                                score -= totalPieceValue;
+                            }
+                        }
+                    }
+                }
+                return engine.turn === 'w' ? score : -score;
+            }
+        }
+
+        // --- 5. UI 바인딩 및 게임 라이프사이클 구현 ---
+        class ChessUI {
+            constructor() {
+                this.engine = new ChessEngine();
+                this.ai = new ChessAI(this.engine, 2);
+
+                this.gameMode = 'vs-ai';
+                this.playerColor = 'w';
+                this.boardFlipped = false;
+
+                this.selectedSquare = null;
+                this.highlightedMoves = [];
+                this.pendingPromotionMove = null;
+
+                // DOM 요소 매핑
+                this.boardEl = document.getElementById('chess-board');
+                this.turnBadgeDesktopEl = document.getElementById('turn-badge-desktop');
+                this.turnBadgeMobileEl = document.getElementById('turn-badge-mobile');
+                this.turnBadgeMobileTextEl = document.getElementById('turn-badge-mobile-text');
+                this.statusMessageDesktopEl = document.getElementById('status-message-desktop');
+                
+                this.modeVsAiBtn = document.getElementById('mode-vs-ai');
+                this.modeVsLocalBtn = document.getElementById('mode-vs-local');
+                this.difficultyContainer = document.getElementById('ai-difficulty-container');
+                this.playerColorContainer = document.getElementById('player-color-container');
+                
+                this.btnUndo = document.getElementById('btn-undo');
+                this.btnFlip = document.getElementById('btn-flip');
+                this.btnNewGame = document.getElementById('btn-new-game');
+
+                this.opponentAvatar = document.getElementById('opponent-avatar');
+                this.opponentNameEl = document.getElementById('opponent-name');
+                this.opponentCapturedEl = document.getElementById('opponent-captured');
+                this.playerCapturedEl = document.getElementById('player-captured');
+
+                this.pgnListEl = document.getElementById('pgn-list');
+                this.pgnEmptyEl = document.getElementById('pgn-empty');
+                this.pgnScrollContainer = document.getElementById('pgn-scroll-container');
+
+                this.promotionOverlay = document.getElementById('promotion-overlay');
+                this.gameOverModal = document.getElementById('game-over-modal');
+                this.modalTitle = document.getElementById('modal-title');
+                this.modalDesc = document.getElementById('modal-desc');
+
+                this.playerTimerEl = document.getElementById('player-timer');
+                this.opponentTimerEl = document.getElementById('opponent-timer');
+                
+                // 모바일 드로어 전용 엘리먼트 매핑
+                this.panelSettings = document.getElementById('panel-settings');
+                this.panelPgn = document.getElementById('panel-pgn');
+                this.drawerOverlay = document.getElementById('drawer-overlay');
+
+                this.timers = { w: 600, b: 600 };
+                this.timerInterval = null;
+
+                this.initEventListeners();
+                this.startNewGame();
+            }
+
+            initEventListeners() {
+                this.modeVsAiBtn.addEventListener('click', () => this.setGameMode('vs-ai'));
+                this.modeVsLocalBtn.addEventListener('click', () => this.setGameMode('vs-local'));
+
+                document.querySelectorAll('.difficulty-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        document.querySelectorAll('.difficulty-btn').forEach(b => b.classList.replace('bg-indigo-600', 'bg-slate-800'));
+                        document.querySelectorAll('.difficulty-btn').forEach(b => b.classList.replace('text-white', 'text-slate-300'));
+                        
+                        e.currentTarget.classList.replace('bg-slate-800', 'bg-indigo-600');
+                        e.currentTarget.classList.replace('text-slate-300', 'text-white');
+                        
+                        const level = e.currentTarget.getAttribute('data-level');
+                        this.ai.setDifficulty(level);
+                        this.updateOpponentProfile();
+                    });
+                });
+
+                document.getElementById('color-white').addEventListener('click', () => {
+                    this.playerColor = 'w';
+                    this.updateColorSelectionUI();
+                    this.startNewGame();
+                });
+                document.getElementById('color-black').addEventListener('click', () => {
+                    this.playerColor = 'b';
+                    this.updateColorSelectionUI();
+                    this.startNewGame();
+                });
+
+                this.btnUndo.addEventListener('click', () => this.undoMove());
+                this.btnFlip.addEventListener('click', () => this.flipBoard());
+                this.btnNewGame.addEventListener('click', () => this.startNewGame());
+
+                document.querySelectorAll('.promo-choice-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const type = e.currentTarget.getAttribute('data-promo');
+                        this.completePromotion(type);
+                    });
+                });
+
+                document.getElementById('modal-btn-restart').addEventListener('click', () => {
+                    this.hideGameOverModal();
+                    this.startNewGame();
+                });
+                document.getElementById('modal-btn-close').addEventListener('click', () => {
+                    this.hideGameOverModal();
+                });
+
+                // 모바일 전용 토글 이벤트 추가
+                document.getElementById('btn-toggle-settings').addEventListener('click', () => this.openDrawer('settings'));
+                document.getElementById('btn-toggle-pgn').addEventListener('click', () => this.openDrawer('pgn'));
+                
+                document.getElementById('btn-close-settings').addEventListener('click', () => this.closeDrawers());
+                document.getElementById('btn-close-pgn').addEventListener('click', () => this.closeDrawers());
+                this.drawerOverlay.addEventListener('click', () => this.closeDrawers());
+            }
+
+            // 모바일 드로어 서랍 열기
+            openDrawer(type) {
+                this.closeDrawers();
+                this.drawerOverlay.classList.remove('opacity-0', 'pointer-events-none');
+                this.drawerOverlay.classList.add('opacity-100');
+
+                if (type === 'settings') {
+                    this.panelSettings.classList.remove('-translate-x-full');
+                } else if (type === 'pgn') {
+                    this.panelPgn.classList.remove('translate-x-full');
+                }
+            }
+
+            // 모바일 드로어 전부 닫기
+            closeDrawers() {
+                this.drawerOverlay.classList.remove('opacity-100');
+                this.drawerOverlay.classList.add('opacity-0', 'pointer-events-none');
+                this.panelSettings.classList.add('-translate-x-full');
+                this.panelPgn.classList.add('translate-x-full');
+            }
+
+            setGameMode(mode) {
+                this.gameMode = mode;
+                if (mode === 'vs-ai') {
+                    this.modeVsAiBtn.classList.replace('text-slate-400', 'text-white');
+                    this.modeVsAiBtn.classList.add('bg-indigo-600');
+                    this.modeVsLocalBtn.classList.replace('text-white', 'text-slate-400');
+                    this.modeVsLocalBtn.classList.remove('bg-indigo-600');
+
+                    this.difficultyContainer.classList.remove('hidden');
+                    this.playerColorContainer.classList.remove('hidden');
+                } else {
+                    this.modeVsLocalBtn.classList.replace('text-slate-400', 'text-white');
+                    this.modeVsLocalBtn.classList.add('bg-indigo-600');
+                    this.modeVsAiBtn.classList.replace('text-white', 'text-slate-400');
+                    this.modeVsAiBtn.classList.remove('bg-indigo-600');
+
+                    this.difficultyContainer.classList.add('hidden');
+                    this.playerColorContainer.classList.add('hidden');
+                }
+                this.updateOpponentProfile();
+                this.startNewGame();
+                this.closeDrawers(); // 모드 선택 시 서랍 자동 닫기
+            }
+
+            updateColorSelectionUI() {
+                const wBtn = document.getElementById('color-white');
+                const bBtn = document.getElementById('color-black');
+
+                if (this.playerColor === 'w') {
+                    wBtn.classList.replace('border-transparent', 'border-indigo-500');
+                    bBtn.classList.replace('border-slate-700', 'border-transparent');
+                } else {
+                    bBtn.classList.replace('border-transparent', 'border-slate-700');
+                    wBtn.classList.replace('border-indigo-500', 'border-transparent');
+                }
+            }
+
+            updateOpponentProfile() {
+                if (this.gameMode === 'vs-ai') {
+                    this.opponentAvatar.innerHTML = '<i data-lucide="cpu" class="w-4 h-4"></i>';
+                    const diffText = this.ai.difficulty === 1 ? '쉬움' : this.ai.difficulty === 2 ? '보통' : '어려움';
+                    this.opponentNameEl.innerText = `인공지능 (Lv.${this.ai.difficulty} ${diffText})`;
+                    this.opponentAvatar.className = 'w-7 h-7 rounded-lg bg-purple-600/20 text-purple-400 flex items-center justify-center font-bold text-sm';
+                } else {
+                    this.opponentAvatar.innerHTML = '<i data-lucide="user" class="w-4 h-4"></i>';
+                    this.opponentNameEl.innerText = '상대 플레이어';
+                    this.opponentAvatar.className = 'w-7 h-7 rounded-lg bg-teal-600/20 text-teal-400 flex items-center justify-center font-bold text-sm';
+                }
+                safeCreateIcons();
+            }
+
+            startNewGame() {
+                this.engine.reset();
+                this.selectedSquare = null;
+                this.highlightedMoves = [];
+                this.pendingPromotionMove = null;
+
+                this.timers = { w: 600, b: 600 };
+                this.stopTimer();
+                this.startTimer();
+
+                if (this.gameMode === 'vs-ai' && this.playerColor === 'b') {
+                    this.boardFlipped = true;
+                } else {
+                    this.boardFlipped = false;
+                }
+
+                this.updateUI();
+
+                if (this.gameMode === 'vs-ai' && this.playerColor === 'b' && this.engine.turn === 'w') {
+                    setTimeout(() => this.triggerAIMove(), 500);
+                }
+            }
+
+            flipBoard() {
+                this.boardFlipped = !this.boardFlipped;
+                this.renderBoard();
+            }
+
+            startTimer() {
+                this.updateTimerDisplay();
+                this.timerInterval = setInterval(() => {
+                    const activeTurn = this.engine.turn;
+                    if (this.timers[activeTurn] > 0) {
+                        this.timers[activeTurn]--;
+                        this.updateTimerDisplay();
+                    } else {
+                        this.stopTimer();
+                        const winner = activeTurn === 'w' ? 'b' : 'w';
+                        this.showGameOverModal('시간 초과', `${winner === 'w' ? '백색' : '흑색'} 플레이어가 시간이 남아 승리하였습니다.`);
+                    }
+                }, 1000);
+            }
+
+            stopTimer() {
+                if (this.timerInterval) {
+                    clearInterval(this.timerInterval);
+                    this.timerInterval = null;
+                }
+            }
+
+            updateTimerDisplay() {
+                const formatTime = (sec) => {
+                    const m = Math.floor(sec / 60).toString().padStart(2, '0');
+                    const s = (sec % 60).toString().padStart(2, '0');
+                    return `${m}:${s}`;
+                };
+
+                if (this.gameMode === 'vs-ai') {
+                    if (this.playerColor === 'w') {
+                        this.playerTimerEl.innerText = formatTime(this.timers.w);
+                        this.opponentTimerEl.innerText = formatTime(this.timers.b);
+                    } else {
+                        this.playerTimerEl.innerText = formatTime(this.timers.b);
+                        this.opponentTimerEl.innerText = formatTime(this.timers.w);
+                    }
+                } else {
+                    this.playerTimerEl.innerText = formatTime(this.timers.w);
+                    this.opponentTimerEl.innerText = formatTime(this.timers.b);
+                }
+            }
+
+            renderBoard() {
+                this.boardEl.innerHTML = '';
+                
+                const isCheck = this.engine.isInCheck(this.engine.turn);
+                const kingPos = isCheck ? this.engine.findKing(this.engine.turn) : null;
+                const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+
+                for (let rIndex = 0; rIndex < 8; rIndex++) {
+                    const r = this.boardFlipped ? rIndex : 7 - rIndex;
+                    
+                    for (let cIndex = 0; cIndex < 8; cIndex++) {
+                        const c = this.boardFlipped ? 7 - cIndex : cIndex;
+                        
+                        const square = document.createElement('div');
+                        const isDark = (r + c) % 2 === 1;
+                        
+                        let squareClass = isDark ? 'bg-slate-700' : 'bg-slate-300';
+                        
+                        if (this.selectedSquare && this.selectedSquare.r === r && this.selectedSquare.c === c) {
+                            squareClass = 'bg-amber-400/90';
+                        }
+                        else if (kingPos && kingPos.r === r && kingPos.c === c) {
+                            squareClass = 'bg-rose-600/80 animate-pulse';
+                        }
+                        
+                        square.className = `${squareClass} w-full h-full flex items-center justify-center relative cursor-pointer select-none transition-colors duration-150`;
+                        square.dataset.row = r;
+                        square.dataset.col = c;
+
+                        // 기보 좌표 레이블 추가 (셀 내부 모서리)
+                        if (rIndex === 7) {
+                            const fileLabel = document.createElement('span');
+                            fileLabel.innerText = files[c];
+                            fileLabel.className = `absolute bottom-0.5 right-1 text-[9px] font-black tracking-tight ${isDark ? 'text-slate-400/80' : 'text-slate-600/80'} pointer-events-none`;
+                            square.appendChild(fileLabel);
+                        }
+                        if (cIndex === 0) {
+                            const rankLabel = document.createElement('span');
+                            rankLabel.innerText = r + 1;
+                            rankLabel.className = `absolute top-0.5 left-1 text-[9px] font-black tracking-tight ${isDark ? 'text-slate-400/80' : 'text-slate-600/80'} pointer-events-none`;
+                            square.appendChild(rankLabel);
+                        }
+
+                        // 기물 그리기
+                        const piece = this.engine.getPiece(r, c);
+                        if (piece) {
+                            const pieceSpan = document.createElement('span');
+                            const colorKey = `${piece.color}_${piece.type}`;
+                            pieceSpan.innerText = PIECE_UNICODE[colorKey] || '';
+                            // cqw 단위의 CSS 클래스를 매핑하여 해상도에 무조건 비례하는 기물 보장
+                            pieceSpan.className = `flex items-center justify-center chess-piece-symbol ${PIECE_COLOR_CLASS[piece.color]} z-10 transition-transform duration-200 hover:scale-110`;
+                            square.appendChild(pieceSpan);
+                        }
+
+                        // 경로 하이라이트 가이드
+                        const canMoveTo = this.highlightedMoves.find(m => m.to.r === r && m.to.c === c);
+                        if (canMoveTo) {
+                            const indicator = document.createElement('div');
+                            if (piece || canMoveTo.isEnPassant) {
+                                indicator.className = 'absolute w-5/6 h-5/6 border-[3px] md:border-4 border-rose-500 rounded-full z-20';
+                            } else {
+                                indicator.className = 'absolute w-3 h-3 sm:w-4 sm:h-4 bg-emerald-500/80 rounded-full z-20';
+                            }
+                            square.appendChild(indicator);
+                        }
+
+                        square.addEventListener('mousedown', () => this.handleSquareInteraction(r, c));
+                        square.addEventListener('touchstart', (e) => {
+                            e.preventDefault();
+                            this.handleSquareInteraction(r, c);
+                        }, { passive: false });
+
+                        this.boardEl.appendChild(square);
+                    }
+                }
+            }
+
+            handleSquareInteraction(r, c) {
+                if (this.engine.getGameResult()) return;
+                if (this.gameMode === 'vs-ai' && this.engine.turn !== this.playerColor) return;
+
+                const clickedPiece = this.engine.getPiece(r, c);
+                const isPossibleMove = this.highlightedMoves.find(m => m.to.r === r && m.to.c === c);
+
+                if (isPossibleMove) {
+                    this.executeUserMove(isPossibleMove);
+                } else if (clickedPiece && clickedPiece.color === this.engine.turn) {
+                    this.selectedSquare = { r, c };
+                    this.highlightedMoves = this.engine.getLegalMoves(r, c);
+                    this.renderBoard();
+                } else {
+                    this.selectedSquare = null;
+                    this.highlightedMoves = [];
+                    this.renderBoard();
+                }
+            }
+
+            executeUserMove(move) {
+                const piece = this.engine.getPiece(move.from.r, move.from.c);
+
+                if (piece.type === 'p' && (move.to.r === 0 || move.to.r === 7)) {
+                    this.pendingPromotionMove = move;
+                    this.showPromotionDialog();
+                    return;
+                }
+
+                this.engine.executeMove(move);
+                this.onMoveCompleted();
+            }
+
+            showPromotionDialog() {
+                this.promotionOverlay.classList.remove('hidden');
+            }
+
+            completePromotion(type) {
+                this.promotionOverlay.classList.add('hidden');
+                if (this.pendingPromotionMove) {
+                    this.engine.executeMove(this.pendingPromotionMove, type);
+                    this.pendingPromotionMove = null;
+                    this.onMoveCompleted();
+                }
+            }
+
+            onMoveCompleted() {
+                this.selectedSquare = null;
+                this.highlightedMoves = [];
+                
+                if (navigator.vibrate) {
+                    navigator.vibrate(30);
+                }
+
+                this.updateUI();
+
+                const result = this.engine.getGameResult();
+                if (result) {
+                    this.stopTimer();
+                    this.handleGameEnded(result);
+                    return;
+                }
+
+                if (this.gameMode === 'vs-ai' && this.engine.turn !== this.playerColor) {
+                    setTimeout(() => this.triggerAIMove(), 400);
+                }
+            }
+
+            undoMove() {
+                if (this.gameMode === 'vs-ai') {
+                    if (this.engine.moveHistory.length >= 2) {
+                        this.engine.undo();
+                        this.engine.undo();
+                        this.selectedSquare = null;
+                        this.highlightedMoves = [];
+                        this.updateUI();
+                    }
+                } else {
+                    if (this.engine.undo()) {
+                        this.selectedSquare = null;
+                        this.highlightedMoves = [];
+                        this.updateUI();
+                    }
+                }
+            }
+
+            triggerAIMove() {
+                const bestMove = this.ai.getBestMove();
+                if (bestMove) {
+                    this.engine.executeMove(bestMove, 'q');
+                    
+                    if (navigator.vibrate) {
+                        navigator.vibrate(20);
+                    }
+                    
+                    this.updateUI();
+
+                    const result = this.engine.getGameResult();
+                    if (result) {
+                        this.stopTimer();
+                        this.handleGameEnded(result);
+                    }
+                }
+            }
+
+            handleGameEnded(result) {
+                let title = '게임 종료';
+                let desc = '';
+
+                if (result.status === 'checkmate') {
+                    const winnerName = result.winner === 'w' ? '백색(White)' : '흑색(Black)';
+                    title = '체크메이트! 외통수';
+                    desc = `훌륭한 전술로 ${winnerName}가 승리하였습니다.`;
+                } else if (result.status === 'stalemate') {
+                    title = '스테일메이트 (무승부)';
+                    desc = '움직일 수 있는 합법수가 없어 경기가 무승부로 종료되었습니다.';
+                } else if (result.status === 'insufficient') {
+                    title = '기물 부족 무승부';
+                    desc = '체크메이트를 유도할 수 있는 기물이 부족하여 자동 무승부 처리되었습니다.';
+                } else if (result.status === '50moves') {
+                    title = '50수 법칙 무승부';
+                    desc = '행마 진행 중 50수 동안 메이트나 전진이 없어 규정상 무승부입니다.';
+                }
+
+                this.showGameOverModal(title, desc);
+            }
+
+            showGameOverModal(title, desc) {
+                this.modalTitle.innerText = title;
+                this.modalDesc.innerText = desc;
+                this.gameOverModal.classList.remove('hidden');
+            }
+
+            hideGameOverModal() {
+                this.gameOverModal.classList.add('hidden');
+            }
+
+            updateUI() {
+                this.renderBoard();
+                this.updateHeaderBadges();
+                this.renderCapturedList();
+                this.renderPgn();
+                this.btnUndo.disabled = this.engine.moveHistory.length === 0;
+            }
+
+            updateHeaderBadges() {
+                const activeColor = this.engine.turn;
+                const isCheck = this.engine.isInCheck(activeColor);
+
+                // 데스크톱 전용 턴 정보 배지 업데이트
+                if (activeColor === 'w') {
+                    this.turnBadgeDesktopEl.innerHTML = '<span class="w-2.5 h-2.5 bg-white border border-slate-400 rounded-full inline-block"></span> 백색 차례';
+                    this.turnBadgeDesktopEl.className = 'flex items-center gap-1.5 font-bold px-2 py-0.5 rounded-full bg-white text-slate-950';
+                    
+                    // 모바일 전용 턴 정보 배지 동시 업뎃
+                    this.turnBadgeMobileTextEl.innerText = "백색 차례";
+                    this.turnBadgeMobileEl.className = 'lg:hidden flex items-center justify-center gap-1 px-2.5 bg-white rounded-xl text-[10px] font-black tracking-tight text-slate-950 border border-slate-300';
+                } else {
+                    this.turnBadgeDesktopEl.innerHTML = '<span class="w-2.5 h-2.5 bg-slate-950 border border-slate-600 rounded-full inline-block"></span> 흑색 차례';
+                    this.turnBadgeDesktopEl.className = 'flex items-center gap-1.5 font-bold px-2 py-0.5 rounded-full bg-slate-950 text-white border border-slate-700';
+                    
+                    // 모바일 전용 턴 정보 배지 동시 업뎃
+                    this.turnBadgeMobileTextEl.innerText = "흑색 차례";
+                    this.turnBadgeMobileEl.className = 'lg:hidden flex items-center justify-center gap-1 px-2.5 bg-slate-950 rounded-xl text-[10px] font-black tracking-tight text-white border border-slate-700';
+                }
+
+                // 체크 알림 메시지 분기 처리
+                if (isCheck) {
+                    this.statusMessageDesktopEl.innerHTML = '⚠️ 체크 상태!';
+                    this.statusMessageDesktopEl.className = 'text-center py-2 px-3 rounded-xl text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30';
+                } else {
+                    this.statusMessageDesktopEl.innerHTML = '안정적 경기 진행 중';
+                    this.statusMessageDesktopEl.className = 'text-center py-2 px-3 rounded-xl text-xs font-semibold bg-slate-900/50 text-slate-300';
+                }
+            }
+
+            renderCapturedList() {
+                this.playerCapturedEl.innerHTML = '';
+                this.opponentCapturedEl.innerHTML = '';
+
+                const whiteCaptured = this.engine.capturedPieces.w;
+                whiteCaptured.forEach(piece => {
+                    const el = document.createElement('span');
+                    el.innerText = PIECE_UNICODE[`b_${piece}`] || '';
+                    el.className = 'text-sm text-slate-400';
+                    this.playerCapturedEl.appendChild(el);
+                });
+
+                const blackCaptured = this.engine.capturedPieces.b;
+                blackCaptured.forEach(piece => {
+                    const el = document.createElement('span');
+                    el.innerText = PIECE_UNICODE[`w_${piece}`] || '';
+                    el.className = 'text-sm text-slate-400';
+                    this.opponentCapturedEl.appendChild(el);
+                });
+            }
+
+            renderPgn() {
+                this.pgnListEl.innerHTML = '';
+                const history = this.engine.moveHistory;
+                if (history.length === 0) {
+                    this.pgnEmptyEl.classList.remove('hidden');
+                    return;
+                }
+                
+                this.pgnEmptyEl.classList.add('hidden');
+
+                for (let i = 0; i < history.length; i += 2) {
+                    const turnIndex = Math.floor(i / 2) + 1;
+                    const wMove = history[i];
+                    const wText = this.getSanText(wMove);
+                    const bMove = history[i + 1];
+                    const bText = bMove ? this.getSanText(bMove) : '';
+
+                    const rowEl = document.createElement('div');
+                    rowEl.className = 'contents';
+
+                    const leftCol = document.createElement('span');
+                    leftCol.className = 'text-slate-400 font-bold';
+                    leftCol.innerText = `${turnIndex}. ${wText}`;
+
+                    const rightCol = document.createElement('span');
+                    rightCol.className = 'text-slate-300';
+                    rightCol.innerText = bText;
+
+                    rowEl.appendChild(leftCol);
+                    rowEl.appendChild(rightCol);
+                    this.pgnListEl.appendChild(rowEl);
+                }
+
+                this.pgnScrollContainer.scrollTop = this.pgnScrollContainer.scrollHeight;
+            }
+
+            getSanText(stateSnapshot) {
+                const { move, piece, captured, isPromotion } = stateSnapshot;
+                if (move.isCastle) {
+                    return move.isCastle === 'k' ? 'O-O' : 'O-O-O';
+                }
+                const cols = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+                const pName = piece.type.toUpperCase() === 'P' ? '' : piece.type.toUpperCase();
+                const target = cols[move.to.c] + (8 - move.to.r);
+                const cap = captured ? 'x' : '';
+                const promo = isPromotion ? '=Q' : '';
+                return pName + cap + target + promo;
+            }
+        }
+
+        // 샌드박스 Iframe 누수 방지 이중 부트스트랩 스크립트
+        function initApp() {
+            safeCreateIcons();
+            window.chessUI = new ChessUI();
+        }
+
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            initApp();
+        } else {
+            document.addEventListener('DOMContentLoaded', initApp);
+        }
+    </script>
+</body>
+</html>
