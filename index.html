@@ -741,7 +741,7 @@
         function renderOnlineUsers(users) {
             usersList.innerHTML = '';
             onlineCount.innerText = users.length;
-            activeUserCounter.innerText = `온라인: ${users.length}명`;
+            activeUserCounter.innerText = `누적: ${users.length}명`;
 
             if (users.length === 0) {
                 usersList.innerHTML = `<p class="text-xs text-gray-500 text-center py-4 w-full">접속자가 없습니다.</p>`;
