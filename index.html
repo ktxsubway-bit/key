@@ -3,1571 +3,1201 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>스마트 체스 (AI & 2인 대전) - Ricejamjam</title>
-    <!-- Tailwind CSS -->
+    <title>수유게임(Suyu Game) 공식 커뮤니티</title>
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- FontAwesome 아이콘 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <!-- Google Identity Services (GSI) SDK -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
-        /* 드래그 및 터치 조작 최적화 */
-        .no-select {
-            -webkit-touch-callout: none;
-            -webkit-user-select: none;
-            -khtml-user-select: none;
-            -moz-user-select: none;
-            -ms-user-select: none;
-            user-select: none;
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #0b0f19;
+            color: #e2e8f0;
         }
-        /* 스무스한 전환 효과 */
-        .transition-all-custom {
-            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        .gaming-title {
+            font-family: 'Orbitron', sans-serif;
         }
-        /* 컨테이너 쿼리를 활용한 완벽한 1:1 기물 크기 동적 대응 */
-        #board-container {
-            container-type: inline-size;
-            width: 100%;
-            /* 뷰포트 높이에 맞춤 설계하여 가로모드/세로모드 스크롤 완전 억제 */
-            max-width: min(100%, 78vh, 520px);
-            margin: 0 auto;
+        /* Custom scrollbar for chat */
+        .chat-scrollbar::-webkit-scrollbar {
+            width: 6px;
         }
-        #chess-board {
-            display: grid !important;
-            grid-template-columns: repeat(8, minmax(0, 1fr)) !important;
-            grid-template-rows: repeat(8, minmax(0, 1fr)) !important;
-            width: 100% !important;
-            height: 100% !important;
+        .chat-scrollbar::-webkit-scrollbar-track {
+            background: #111827;
         }
-        /* 기물 폰트 크기를 보드 컨테이너 너비의 정확한 비율로 계산 */
-        .chess-piece-symbol {
-            font-size: 9.8cqw !important;
-            line-height: 1;
+        .chat-scrollbar::-webkit-scrollbar-thumb {
+            background: #4b5563;
+            border-radius: 3px;
+        }
+        .chat-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #6b7280;
+        }
+        /* Neon glowing effects */
+        .neon-border {
+            box-shadow: 0 0 15px rgba(139, 92, 246, 0.3);
+        }
+        .neon-text {
+            text-shadow: 0 0 8px rgba(139, 92, 246, 0.6);
         }
     </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col no-select font-sans overflow-x-hidden relative">
+<body class="min-h-screen flex flex-col overflow-x-hidden">
 
-    <!-- 모바일 드로어 오픈 시 배경 어두워짐 레이어 -->
-    <div id="drawer-overlay" class="fixed inset-0 bg-black/60 z-30 opacity-0 pointer-events-none transition-opacity duration-300 lg:hidden"></div>
-
-    <!-- 헤더 -->
-    <header class="bg-slate-800 border-b border-slate-700 py-3 md:py-4 px-6 flex justify-between items-center shadow-lg shrink-0 z-20">
-        <div class="flex items-center gap-3">
-            <div class="bg-indigo-600 p-1.5 md:p-2 rounded-lg text-white">
-                <i data-lucide="crown" class="w-5 h-5 md:w-6 md:h-6"></i>
-            </div>
-            <h1 class="text-lg md:text-2xl font-black tracking-wider bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
-                CHESS MIND
-            </h1>
-        </div>
-        <div class="flex gap-2">
-            <button id="btn-new-game" class="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-1.5 px-3 md:px-4 rounded-lg transition-all-custom text-xs md:text-sm shadow-md">
-                <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
-                <span>새 게임</span>
-            </button>
-        </div>
-    </header>
-
-    <!-- 메인 레이아웃 -->
-    <main class="flex-1 flex flex-col lg:flex-row p-3 md:p-6 gap-6 max-w-7xl mx-auto w-full items-center lg:items-center justify-center relative overflow-hidden">
-        
-        <!-- 왼쪽: 게임 설정 패널 (모바일에서는 서랍장) -->
-        <div id="panel-settings" class="fixed inset-y-0 left-0 z-40 w-72 max-w-[80vw] transform -translate-x-full transition-transform duration-300 ease-in-out bg-slate-800 p-5 shadow-2xl border-r border-slate-700 lg:relative lg:inset-auto lg:translate-x-0 lg:shadow-none lg:border-none lg:p-0 lg:w-80 lg:flex lg:flex-col lg:gap-4 shrink-0">
-            
-            <!-- 모바일용 드로어 닫기 버튼 -->
-            <button id="btn-close-settings" class="lg:hidden absolute top-4 right-4 text-slate-400 hover:text-white">
-                <i data-lucide="x" class="w-5 h-5"></i>
-            </button>
-
-            <!-- 실제 카드 몸체 -->
-            <div class="bg-slate-800 lg:border lg:border-slate-700/80 p-4 rounded-2xl lg:shadow-xl w-full">
-                <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <i data-lucide="settings" class="w-4 h-4 text-indigo-400"></i> 게임 설정
-                </h2>
-                
-                <!-- 게임 모드 선택 -->
-                <div class="mb-4">
-                    <label class="block text-xs font-medium text-slate-400 mb-1.5">게임 모드</label>
-                    <div class="grid grid-cols-2 gap-2 bg-slate-900 p-1 rounded-xl">
-                        <button id="mode-vs-ai" class="py-2 px-3 rounded-lg text-xs font-bold transition-all-custom flex items-center justify-center gap-1.5 bg-indigo-600 text-white">
-                            <i data-lucide="cpu" class="w-3.5 h-3.5"></i> AI 대전
-                        </button>
-                        <button id="mode-vs-local" class="py-2 px-3 rounded-lg text-xs font-bold transition-all-custom flex items-center justify-center gap-1.5 text-slate-400 hover:text-white">
-                            <i data-lucide="users" class="w-3.5 h-3.5"></i> 2인 대전
-                        </button>
-                    </div>
-                </div>
-
-                <!-- AI 난이도 설정 -->
-                <div id="ai-difficulty-container" class="mb-4">
-                    <label class="block text-xs font-medium text-slate-400 mb-1.5">AI 난이도</label>
-                    <div class="grid grid-cols-3 gap-1 bg-slate-900 p-1 rounded-xl">
-                        <button data-level="1" class="difficulty-btn py-1.5 text-xs font-semibold rounded-lg transition-all-custom bg-slate-800 text-slate-300 hover:text-white">쉬움</button>
-                        <button data-level="2" class="difficulty-btn py-1.5 text-xs font-semibold rounded-lg transition-all-custom bg-indigo-600 text-white">보통</button>
-                        <button data-level="3" class="difficulty-btn py-1.5 text-xs font-semibold rounded-lg transition-all-custom bg-slate-800 text-slate-300 hover:text-white">어려움</button>
-                    </div>
-                </div>
-
-                <!-- 플레이어 색상 선택 -->
-                <div id="player-color-container" class="mb-2">
-                    <label class="block text-xs font-medium text-slate-400 mb-1.5">플레이어 색상</label>
-                    <div class="grid grid-cols-2 gap-2">
-                        <button id="color-white" class="py-2 bg-white text-slate-900 font-bold rounded-lg text-[11px] border-2 border-indigo-500 flex items-center justify-center gap-1">
-                            <span class="w-2.5 h-2.5 bg-white border border-slate-400 rounded-full"></span> 백색 (선공)
-                        </button>
-                        <button id="color-black" class="py-2 bg-slate-950 text-white font-bold rounded-lg text-[11px] border-2 border-transparent hover:border-slate-700 flex items-center justify-center gap-1">
-                            <span class="w-2.5 h-2.5 bg-slate-950 border border-slate-600 rounded-full"></span> 흑색 (후공)
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 상태 및 정보 카드 (데스크톱 전용 바인딩 유지) -->
-            <div class="hidden lg:flex bg-slate-800 border border-slate-700/80 p-4 rounded-2xl shadow-xl flex-col justify-between min-h-[180px] w-full">
-                <div>
-                    <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                        <i data-lucide="info" class="w-4 h-4 text-indigo-400"></i> 경기 정보
-                    </h2>
-                    <div class="bg-slate-900 p-2.5 rounded-xl flex items-center justify-between mb-3 text-xs">
-                        <span class="text-slate-400">현재 차례</span>
-                        <div id="turn-badge-desktop" class="flex items-center gap-1.5 font-bold px-2 py-0.5 rounded-full bg-white text-slate-950">
-                            <span class="w-2 h-2 bg-white border border-slate-400 rounded-full inline-block"></span>
-                            <span>백색</span>
-                        </div>
-                    </div>
-                    <div id="status-message-desktop" class="text-center py-2 px-3 rounded-xl text-xs font-semibold bg-slate-900/50 text-slate-300">
-                        대국 준비 완료
-                    </div>
-                </div>
+    <!-- Loading Overlay -->
+    <div id="loading-screen" class="fixed inset-0 bg-[#070a13] z-50 flex flex-col items-center justify-center transition-opacity duration-500">
+        <div class="relative w-24 h-24">
+            <div class="absolute inset-0 rounded-full border-4 border-t-purple-600 border-r-pink-500 border-b-blue-500 border-l-transparent animate-spin"></div>
+            <div class="absolute inset-2 bg-[#0b0f19] rounded-full flex items-center justify-center">
+                <i class="fa-solid fa-gamepad text-3xl text-purple-500 animate-pulse"></i>
             </div>
         </div>
+        <h2 class="gaming-title text-xl font-bold mt-6 text-purple-400 tracking-widest neon-text">SUYU GAME COMMUNITY</h2>
+        <p class="text-gray-400 text-sm mt-2">시스템을 로드하고 있습니다...</p>
+    </div>
 
-        <!-- 가운데: 체스판 및 모바일 전용 토글러 -->
-        <div class="flex-1 flex flex-col items-center justify-center w-full max-w-[540px]">
-            
-            <!-- 상대방 정보 플레이트 -->
-            <div class="w-full flex justify-between items-center px-3 py-1.5 mb-2 bg-slate-800/40 rounded-xl border border-slate-700/50">
-                <div class="flex items-center gap-2">
-                    <div id="opponent-avatar" class="w-7 h-7 rounded-lg bg-purple-600/20 text-purple-400 flex items-center justify-center font-bold text-xs">
-                        <i data-lucide="cpu" class="w-4 h-4"></i>
-                    </div>
-                    <div>
-                        <div id="opponent-name" class="text-xs font-bold text-slate-200 leading-tight">인공지능 (Lv.2 보통)</div>
-                        <div id="opponent-captured" class="flex items-center gap-0.5 text-[10px] text-slate-400 h-3"></div>
-                    </div>
-                </div>
-                <div id="opponent-timer" class="text-xs font-mono bg-slate-900 px-2 py-0.5 rounded text-slate-400">--:--</div>
-            </div>
-
-            <!-- 모바일 전용 상단 서랍 토글 액션 바 (화면이 작을 때만 등장) -->
-            <div class="flex lg:hidden w-full gap-2 mb-2">
-                <button id="btn-toggle-settings" class="flex-1 py-2 px-3 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border border-slate-700/80 transition-all-custom">
-                    <i data-lucide="settings" class="w-3.5 h-3.5 text-indigo-400"></i>설정 변경
-                </button>
-                <button id="btn-toggle-pgn" class="flex-1 py-2 px-3 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border border-slate-700/80 transition-all-custom">
-                    <i data-lucide="scroll-text" class="w-3.5 h-3.5 text-indigo-400"></i>기보 기록
-                </button>
-            </div>
-
-            <!-- 체스판 외곽 박스 및 동적 종횡비 컨테이너 -->
-            <div id="board-container" class="relative aspect-square bg-slate-950 p-2 md:p-3 rounded-2xl md:rounded-3xl shadow-2xl border-2 md:border-4 border-slate-800">
-                <div id="chess-board" class="rounded-lg overflow-hidden touch-none relative">
-                    <!-- 자바스크립트로 체스판 격자와 기물을 실시간 배치합니다. -->
-                </div>
-
-                <!-- 폰 승진(Promotion) 팝업 모달 -->
-                <div id="promotion-overlay" class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm rounded-xl flex items-center justify-center hidden z-50">
-                    <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700 max-w-[260px] text-center shadow-2xl">
-                        <p class="text-xs font-bold text-slate-200 mb-3">프로모션 기물 선택</p>
-                        <div class="grid grid-cols-4 gap-2">
-                            <button data-promo="q" class="promo-choice-btn p-2 bg-slate-700 hover:bg-slate-600 rounded-xl flex flex-col items-center">
-                                <span class="text-2xl text-white">♛</span>
-                                <span class="text-[9px] mt-1 text-slate-300">퀸</span>
-                            </button>
-                            <button data-promo="r" class="promo-choice-btn p-2 bg-slate-700 hover:bg-slate-600 rounded-xl flex flex-col items-center">
-                                <span class="text-2xl text-white">♜</span>
-                                <span class="text-[9px] mt-1 text-slate-300">룩</span>
-                            </button>
-                            <button data-promo="b" class="promo-choice-btn p-2 bg-slate-700 hover:bg-slate-600 rounded-xl flex flex-col items-center">
-                                <span class="text-2xl text-white">♝</span>
-                                <span class="text-[9px] mt-1 text-slate-300">비숍</span>
-                            </button>
-                            <button data-promo="n" class="promo-choice-btn p-2 bg-slate-700 hover:bg-slate-600 rounded-xl flex flex-col items-center">
-                                <span class="text-2xl text-white">♞</span>
-                                <span class="text-[9px] mt-1 text-slate-300">나이트</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 내 정보 플레이트 및 턴 가이드 정보 통합 배치 -->
-            <div class="w-full flex justify-between items-center px-3 py-1.5 mt-2 bg-slate-800/40 rounded-xl border border-slate-700/50">
-                <div class="flex items-center gap-2">
-                    <div class="w-7 h-7 rounded-lg bg-indigo-600/20 text-indigo-400 flex items-center justify-center font-bold text-xs">
-                        <i data-lucide="user" class="w-4 h-4"></i>
-                    </div>
-                    <div>
-                        <div id="player-name" class="text-xs font-bold text-slate-200 leading-tight">플레이어 (나)</div>
-                        <div id="player-captured" class="flex items-center gap-0.5 text-[10px] text-slate-400 h-3"></div>
-                    </div>
-                </div>
-                <div id="player-timer" class="text-xs font-mono bg-slate-900 px-2 py-0.5 rounded text-slate-400">--:--</div>
-            </div>
-
-            <!-- 모바일/공통 하단 퀵 액션 컨트롤러 -->
-            <div class="grid grid-cols-3 gap-2 w-full mt-3">
-                <button id="btn-undo" class="flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 font-bold py-2.5 px-2 rounded-xl border border-slate-700/50 transition-all-custom text-xs">
-                    <i data-lucide="undo-2" class="w-3.5 h-3.5 text-indigo-400"></i> 한수 무르기
-                </button>
-                <button id="btn-flip" class="flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2.5 px-2 rounded-xl border border-slate-700/50 transition-all-custom text-xs">
-                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-indigo-400"></i> 판 뒤집기
-                </button>
-                <!-- 모바일 실시간 턴 인포 알림 -->
-                <div id="turn-badge-mobile" class="lg:hidden flex items-center justify-center gap-1 px-1 bg-slate-950/80 rounded-xl text-[10px] font-black tracking-tight text-white border border-slate-800">
-                    <span class="w-2 h-2 bg-white rounded-full inline-block"></span>
-                    <span id="turn-badge-mobile-text">백색 차례</span>
-                </div>
-            </div>
+    <!-- Custom Alert/Toast Notification (Replaces native alerts) -->
+    <div id="toast" class="fixed top-5 right-5 z-50 transform translate-y-[-100px] opacity-0 transition-all duration-300 bg-gray-800 border-l-4 border-purple-500 text-white px-6 py-4 rounded-lg shadow-2xl flex items-center gap-3">
+        <span id="toast-icon" class="text-purple-400 text-xl"><i class="fa-solid fa-bell"></i></span>
+        <div>
+            <p id="toast-msg" class="font-medium text-sm"></p>
         </div>
+    </div>
 
-        <!-- 오른쪽: 이동 기록 기보 대시보드 (모바일에서는 서랍장) -->
-        <div id="panel-pgn" class="fixed inset-y-0 right-0 z-40 w-72 max-w-[80vw] transform translate-x-full transition-transform duration-300 ease-in-out bg-slate-800 p-5 shadow-2xl border-l border-slate-700 lg:relative lg:inset-auto lg:translate-x-0 lg:shadow-none lg:border-none lg:p-0 lg:w-64 lg:flex lg:flex-col lg:h-[520px]">
-            
-            <!-- 모바일용 드로어 닫기 버튼 -->
-            <button id="btn-close-pgn" class="lg:hidden absolute top-4 left-4 text-slate-400 hover:text-white">
-                <i data-lucide="x" class="w-5 h-5"></i>
-            </button>
-
-            <!-- 실제 기보 내부 몸체 -->
-            <div class="h-full flex flex-col justify-between">
-                <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2 mt-4 lg:mt-0">
-                    <i data-lucide="scroll-text" class="w-4 h-4 text-indigo-400"></i> 대국 기록 (PGN)
-                </h2>
-                <div id="pgn-scroll-container" class="flex-1 overflow-y-auto bg-slate-900 rounded-xl p-3 text-xs font-mono text-slate-300 min-h-[220px]">
-                    <div id="pgn-list" class="grid grid-cols-2 gap-y-1 gap-x-4"></div>
-                    <div id="pgn-empty" class="text-slate-500 text-center py-12">
-                        기록이 존재하지 않습니다.
-                    </div>
-                </div>
-                <div class="hidden lg:block mt-3 text-[10px] text-slate-500 text-center leading-relaxed">
-                    터치 시 이동 궤적이 가이드됩니다.
-                </div>
-            </div>
-        </div>
-    </main>
-
-    <!-- 커스텀 알림/종료 모달 -->
-    <div id="game-over-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center hidden z-50 p-4">
-        <div class="bg-slate-800 p-6 md:p-8 rounded-3xl border-2 border-indigo-500/50 max-w-sm w-full text-center shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-            <div class="w-14 h-16 bg-indigo-600/20 text-indigo-400 rounded-full flex items-center justify-center mx-auto mb-4">
-                <i data-lucide="trophy" class="w-8 h-8"></i>
-            </div>
-            <h3 id="modal-title" class="text-xl font-bold text-white mb-2">게임 종료</h3>
-            <p id="modal-desc" class="text-sm text-slate-300 mb-6">체크메이트로 승부 결정!</p>
-            <div class="flex flex-col gap-2">
-                <button id="modal-btn-restart" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-sm transition-all-custom">
-                    다시 대국하기
-                </button>
-                <button id="modal-btn-close" class="w-full py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold rounded-xl text-sm transition-all-custom">
-                    닫기
-                </button>
+    <!-- -->
+    <!-- Custom Confirm Modal (Replaces browser confirm dialogs to work seamlessly inside iframes) -->
+    <div id="confirm-modal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl relative">
+            <div class="absolute -top-10 -right-10 w-24 h-24 bg-red-600 rounded-full filter blur-3xl opacity-10"></div>
+            <h3 class="text-lg font-bold text-white mb-2 flex items-center gap-2">
+                <i class="fa-solid fa-triangle-exclamation text-red-500"></i>
+                <span id="confirm-modal-title">확인</span>
+            </h3>
+            <p class="text-sm text-gray-400 mb-6 leading-relaxed" id="confirm-modal-msg">정말로 실행하시겠습니까?</p>
+            <div class="flex justify-end gap-3">
+                <button id="btn-confirm-cancel" class="px-4 py-2.5 bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white rounded-xl text-xs font-bold transition">취소</button>
+                <button id="btn-confirm-ok" class="px-4 py-2.5 bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-500 hover:to-pink-500 text-white font-bold rounded-xl text-xs transition shadow-lg shadow-red-600/20">실행</button>
             </div>
         </div>
     </div>
 
-    <!-- 푸터 -->
-    <footer class="bg-slate-950 text-slate-500 text-xs text-center py-4 border-t border-slate-800 shrink-0">
-        <p>© 2026 Ricejamjam 스튜디오. All rights reserved.</p>
-    </footer>
+    <!-- MAIN APP STRUCTURE -->
+    <div class="flex-grow flex flex-col">
 
-    <!-- 체스 프로그램 로직 -->
-    <script>
-        function safeCreateIcons() {
+        <!-- 1. AUTH SCREEN (로그인 및 프로필 입력) -->
+        <div id="auth-screen" class="hidden flex-grow flex items-center justify-center p-4">
+            <div class="w-full max-w-md bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl p-8 neon-border relative overflow-hidden">
+                <div class="absolute -top-10 -right-10 w-40 h-40 bg-purple-600 rounded-full filter blur-3xl opacity-20"></div>
+                <div class="absolute -bottom-10 -left-10 w-40 h-40 bg-blue-600 rounded-full filter blur-3xl opacity-20"></div>
+                
+                <div class="text-center relative z-10">
+                    <div class="inline-flex p-3 bg-purple-900/40 rounded-2xl border border-purple-500/30 mb-4">
+                        <i class="fa-solid fa-gamepad text-4xl text-purple-400 animate-bounce"></i>
+                    </div>
+                    <h1 class="gaming-title text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 tracking-wider">SUYU GAME</h1>
+                    <p class="text-gray-400 text-sm mt-2">수유게임 유저들을 위한 공식 실시간 소통 공간</p>
+                </div>
+
+                <!-- -->
+                <!-- Step 1: 구글 소셜 로그인 (필수 단계) -->
+                <div id="step-login" class="mt-8 space-y-4 relative z-10 flex flex-col items-center justify-center">
+                    <div class="w-full text-center p-4 bg-gray-800/40 border border-gray-800 rounded-xl mb-2">
+                        <p class="text-xs text-purple-300 font-bold mb-1"><i class="fa-solid fa-shield-halved mr-1"></i> 필수 본인 인증 단계</p>
+                        <p class="text-[11px] text-gray-400">커뮤니티의 모든 활동과 실시간 채팅을 시작하려면 반드시 구글 로그인이 완료되어야 합니다.</p>
+                    </div>
+                    <!-- Google Identity Services 원클릭 및 맞춤형 표준 버튼이 그려질 컨테이너 -->
+                    <div id="btn-google-login-container" class="w-full flex justify-center py-2"></div>
+                    <p class="text-center text-xs text-gray-500 mt-2">안전한 구글 간편 인증 서비스를 활용합니다.</p>
+                </div>
+
+                <!-- Step 2: 프로필 설정 (로그인 성공한 사람만 접근 가능) -->
+                <div id="step-profile" class="hidden mt-8 space-y-6 relative z-10">
+                    <div class="bg-purple-900/10 border border-purple-500/10 rounded-xl p-3 text-center">
+                        <p class="text-xs text-purple-300"><i class="fa-solid fa-circle-check mr-1"></i> 구글 인증 완료! 커뮤니티 전용 프로필을 세팅하세요.</p>
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-200 border-b border-gray-800 pb-2">커뮤니티 프로필 설정</h3>
+                    
+                    <!-- 아바타 로고 선택기 -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-2">아바타 로고 선택</label>
+                        <div id="avatar-grid" class="grid grid-cols-5 gap-3">
+                            <button class="avatar-opt h-12 w-12 rounded-xl bg-purple-900/50 hover:bg-purple-700/50 flex items-center justify-center text-xl text-purple-300 border border-purple-500/30 transition duration-150" data-icon="fa-ghost">
+                                <i class="fa-solid fa-ghost"></i>
+                            </button>
+                            <button class="avatar-opt h-12 w-12 rounded-xl bg-gray-800 hover:bg-purple-700/50 flex items-center justify-center text-xl text-blue-300 border border-transparent transition duration-150" data-icon="fa-dragon">
+                                <i class="fa-solid fa-dragon"></i>
+                            </button>
+                            <button class="avatar-opt h-12 w-12 rounded-xl bg-gray-800 hover:bg-purple-700/50 flex items-center justify-center text-xl text-pink-300 border border-transparent transition duration-150" data-icon="fa-mask">
+                                <i class="fa-solid fa-mask"></i>
+                            </button>
+                            <button class="avatar-opt h-12 w-12 rounded-xl bg-gray-800 hover:bg-purple-700/50 flex items-center justify-center text-xl text-green-300 border border-transparent transition duration-150" data-icon="fa-robot">
+                                <i class="fa-solid fa-robot"></i>
+                            </button>
+                            <button class="avatar-opt h-12 w-12 rounded-xl bg-gray-800 hover:bg-purple-700/50 flex items-center justify-center text-xl text-yellow-300 border border-transparent transition duration-150" data-icon="fa-hat-wizard">
+                                <i class="fa-solid fa-hat-wizard"></i>
+                            </button>
+                            <button class="avatar-opt h-12 w-12 rounded-xl bg-gray-800 hover:bg-purple-700/50 flex items-center justify-center text-xl text-indigo-300 border border-transparent transition duration-150" data-icon="fa-gamepad">
+                                <i class="fa-solid fa-gamepad"></i>
+                            </button>
+                            <button class="avatar-opt h-12 w-12 rounded-xl bg-gray-800 hover:bg-purple-700/50 flex items-center justify-center text-xl text-red-300 border border-transparent transition duration-150" data-icon="fa-skull">
+                                <i class="fa-solid fa-skull"></i>
+                            </button>
+                            <button class="avatar-opt h-12 w-12 rounded-xl bg-gray-800 hover:bg-purple-700/50 flex items-center justify-center text-xl text-teal-300 border border-transparent transition duration-150" data-icon="fa-bolt">
+                                <i class="fa-solid fa-bolt"></i>
+                            </button>
+                            <button class="avatar-opt h-12 w-12 rounded-xl bg-gray-800 hover:bg-purple-700/50 flex items-center justify-center text-xl text-orange-300 border border-transparent transition duration-150" data-icon="fa-crown">
+                                <i class="fa-solid fa-crown"></i>
+                            </button>
+                            <button class="avatar-opt h-12 w-12 rounded-xl bg-gray-800 hover:bg-purple-700/50 flex items-center justify-center text-xl text-rose-300 border border-transparent transition duration-150" data-icon="fa-cat">
+                                <i class="fa-solid fa-cat"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 닉네임 입력 -->
+                    <div>
+                        <label for="input-nickname" class="block text-sm font-medium text-gray-400 mb-2">닉네임 설정</label>
+                        <div class="relative">
+                            <input type="text" id="input-nickname" maxlength="15" placeholder="플레이어 이름을 입력해 주세요" class="w-full bg-gray-800/80 border border-gray-700 focus:border-purple-500 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition duration-200">
+                        </div>
+                    </div>
+
+                    <button id="btn-submit-profile" class="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold py-3.5 px-6 rounded-xl transition duration-200 shadow-lg flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-door-open"></i> 커뮤니티 입장하기
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. MAIN APP CONTENT (로그인 성공 후 표시되는 메인 페이지) -->
+        <div id="main-screen" class="hidden flex-grow flex flex-col">
+            <!-- Navigation Bar -->
+            <nav class="bg-[#0e1626]/90 border-b border-gray-800 sticky top-0 z-40 backdrop-blur-md">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="flex items-center justify-between h-16">
+                        <div class="flex items-center gap-3">
+                            <div class="p-2 bg-gradient-to-tr from-purple-600 to-pink-500 rounded-lg">
+                                <i class="fa-solid fa-gamepad text-white text-lg"></i>
+                            </div>
+                            <span class="gaming-title text-xl font-black text-white tracking-widest neon-text">SUYU GAME</span>
+                        </div>
+
+                        <!-- Active Menu Navigation (Desktop) -->
+                        <div class="hidden md:flex items-center space-x-2">
+                            <button id="nav-btn-chat" class="nav-tab active px-4 py-2 rounded-lg bg-purple-900/40 text-purple-300 font-medium text-sm border border-purple-500/20 flex items-center gap-2 transition">
+                                <i class="fa-solid fa-comments"></i> 실시간 채팅
+                            </button>
+                            <button id="nav-btn-board" class="nav-tab px-4 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800/60 font-medium text-sm flex items-center gap-2 transition">
+                                <i class="fa-solid fa-clipboard-list"></i> 수유게임 랭킹 & 공략
+                            </button>
+                        </div>
+
+                        <!-- User Profile Status & Logout -->
+                        <div class="flex items-center gap-4">
+                            <div class="flex items-center gap-3 bg-gray-800/40 border border-gray-800 py-1.5 px-3 rounded-xl">
+                                <div id="nav-user-avatar" class="h-8 w-8 rounded-lg bg-purple-900/60 flex items-center justify-center text-purple-300 text-sm">
+                                    <i class="fa-solid fa-ghost"></i>
+                                </div>
+                                <div class="hidden sm:block text-left">
+                                    <p id="nav-user-name" class="text-xs font-bold text-gray-200">Gamer</p>
+                                    <p class="text-[10px] text-gray-500">수유 게이머</p>
+                                </div>
+                            </div>
+                            <button id="btn-logout" class="text-gray-400 hover:text-red-400 text-sm p-2 rounded-lg hover:bg-red-500/10 transition" title="로그아웃">
+                                <i class="fa-solid fa-right-from-bracket"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+
+            <!-- Navigation Bar (Mobile Menu Trigger/Selector) -->
+            <div class="md:hidden bg-[#0d1321] border-b border-gray-800/80 p-2 flex gap-1">
+                <button id="nav-btn-chat-mob" class="nav-tab flex-1 py-2 rounded-lg bg-purple-900/40 text-purple-300 font-medium text-xs flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-comments"></i> 실시간 채팅
+                </button>
+                <button id="nav-btn-board-mob" class="nav-tab flex-1 py-2 rounded-lg text-gray-400 font-medium text-xs flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-clipboard-list"></i> 게임 정보 & 공략
+                </button>
+            </div>
+
+            <!-- Content Area -->
+            <main class="flex-grow max-w-7xl w-full mx-auto p-4 md:p-6 flex flex-col md:flex-row gap-6">
+                
+                <!-- CHAT MODULE -->
+                <div id="view-chat" class="flex-grow flex flex-col md:flex-row gap-6 w-full h-[calc(100vh-14rem)] md:h-[calc(100vh-10rem)]">
+                    
+                    <!-- Left: Realtime Chat Area -->
+                    <div class="flex-grow flex flex-col bg-[#111827]/80 border border-gray-800 rounded-2xl overflow-hidden shadow-xl">
+                        <!-- Chat Header -->
+                        <div class="bg-gray-900/50 p-4 border-b border-gray-800/80 flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <span class="relative flex h-2 w-2">
+                                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                    <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                </span>
+                                <div>
+                                    <h3 class="font-bold text-gray-100 text-sm sm:text-base">수유게임 통합 채널</h3>
+                                    <p class="text-[11px] text-gray-400">실시간 채팅을 통해 멀티플레이 팀원이나 전략을 공유하세요!</p>
+                                </div>
+                            </div>
+                            <span id="active-user-counter" class="text-xs bg-gray-800 text-gray-400 px-2.5 py-1 rounded-full font-medium">연결 중...</span>
+                        </div>
+
+                        <!-- Chat Messages Container -->
+                        <div id="chat-messages" class="flex-grow p-4 overflow-y-auto space-y-4 chat-scrollbar">
+                            <div class="flex items-center justify-center h-full text-gray-500 text-sm">
+                                <div class="text-center">
+                                    <i class="fa-solid fa-spinner animate-spin text-2xl text-purple-500 mb-3"></i>
+                                    <p>채팅 데이터를 가져오고 있습니다...</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Chat Input Box -->
+                        <form id="chat-form" class="p-3 bg-gray-900/80 border-t border-gray-800/80 flex items-center gap-2">
+                            <input type="text" id="chat-input" maxlength="250" placeholder="메시지를 입력하세요 (비속어는 자제해주세요)" class="flex-grow bg-gray-800/70 border border-gray-700 focus:border-purple-500 focus:outline-none rounded-xl px-4 py-3 text-sm text-white focus:ring-1 focus:ring-purple-500/20">
+                            <button type="submit" class="bg-purple-600 hover:bg-purple-500 text-white font-bold h-11 px-5 rounded-xl transition duration-150 flex items-center justify-center">
+                                <i class="fa-solid fa-paper-plane"></i>
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Right: Online Gamers Panel -->
+                    <div class="w-full md:w-80 bg-gray-900/60 border border-gray-800 rounded-2xl p-4 flex flex-col h-48 md:h-auto overflow-hidden">
+                        <div class="flex items-center justify-between border-b border-gray-800 pb-2 mb-3">
+                            <h4 class="font-bold text-gray-300 text-sm flex items-center gap-2">
+                                <i class="fa-solid fa-users text-purple-400"></i> 접속 중인 게이머
+                            </h4>
+                            <span class="text-xs bg-purple-900/50 text-purple-300 px-2 py-0.5 rounded-full" id="online-count">0</span>
+                        </div>
+                        <div id="users-list" class="flex-grow overflow-y-auto chat-scrollbar space-y-2 flex flex-row md:flex-col gap-2 md:gap-0">
+                            <p class="text-xs text-gray-500 text-center py-4 w-full">접속자가 없습니다.</p>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- BOARD MODULE (게임 추천 & 공략게시판) -->
+                <div id="view-board" class="hidden flex-grow flex flex-col lg:flex-row gap-6 w-full">
+                    
+                    <!-- Left Side: Post List & Creator -->
+                    <div class="flex-grow space-y-6">
+                        
+                        <!-- Create Post Box -->
+                        <div class="bg-gray-900/50 border border-gray-800 rounded-2xl p-5 shadow-lg">
+                            <h3 class="font-bold text-gray-200 text-sm md:text-base mb-4 flex items-center gap-2">
+                                <i class="fa-solid fa-pen-to-square text-purple-400"></i> 수유게임 꿀팁 및 공략 공유하기
+                            </h3>
+                            <form id="post-form" class="space-y-4">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <input type="text" id="post-title" maxlength="50" required placeholder="글 제목" class="w-full bg-gray-800/80 border border-gray-700 focus:border-purple-500 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none">
+                                    <select id="post-game-tag" class="w-full bg-gray-800/80 border border-gray-700 focus:border-purple-500 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none">
+                                        <option value="일반">🎮 일반 게임이야기</option>
+                                        <option value="가위바위보">✌️ 가위바위보</option>
+                                        <option value="과일받기">🍎 과일 받기</option>
+                                        <option value="김밥타이쿤">🍙 김밥천국 타이쿤</option>
+                                        <option value="타자게임">⌨️ 단어 타자</option>
+                                        <option value="두더지잡기">🔨 두더지 잡기</option>
+                                        <option value="벽돌깨기">🧱 벽돌 깨기</option>
+                                        <option value="반응속도">⚡ 반응속도</option>
+                                    </select>
+                                </div>
+                                <textarea id="post-content" rows="3" maxlength="800" required placeholder="게임 팁, 플레이 전략, 또는 고득점 랭킹을 자랑해보세요!" class="w-full bg-gray-800/80 border border-gray-700 focus:border-purple-500 rounded-xl p-4 text-sm text-white focus:outline-none"></textarea>
+                                <div class="flex justify-end">
+                                    <button type="submit" class="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-bold py-2.5 px-6 rounded-xl text-sm transition duration-150 flex items-center gap-2 shadow-md">
+                                        <i class="fa-solid fa-paper-plane"></i> 게시글 등록
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Posts List Container -->
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between">
+                                <h3 class="font-bold text-gray-200 text-lg flex items-center gap-2">
+                                    <i class="fa-solid fa-fire text-red-400"></i> 실시간 피드
+                                </h3>
+                                <button id="btn-refresh-posts" class="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded-lg transition flex items-center gap-1.5">
+                                    <i class="fa-solid fa-rotate"></i> 새로고침
+                                </button>
+                            </div>
+
+                            <div id="posts-container" class="space-y-4">
+                                <div class="text-center py-12 bg-gray-900/30 border border-gray-800/50 rounded-2xl">
+                                    <i class="fa-solid fa-folder-open text-gray-600 text-4xl mb-3"></i>
+                                    <p class="text-gray-500 text-sm">등록된 커뮤니티 게시글이 없습니다. 첫 글을 등록해 보세요!</p>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Right Side: Game Wiki & Shortcuts -->
+                    <div class="w-full lg:w-80 space-y-6">
+                        <!-- Suyu Play Wiki Widget -->
+                        <div class="bg-gray-900/50 border border-gray-800 rounded-2xl p-5 shadow-lg">
+                            <h4 class="font-bold text-gray-200 text-sm mb-4 border-b border-gray-800 pb-2 flex items-center gap-2">
+                                <i class="fa-solid fa-trophy text-yellow-400"></i> 대표 수유게임 목록
+                            </h4>
+                            <div class="space-y-3 text-xs">
+                                <a href="https://suyugame.kro.kr/" target="_blank" class="block p-2.5 rounded-xl bg-gray-800/40 hover:bg-purple-950/20 border border-gray-800 hover:border-purple-500/30 transition group">
+                                    <p class="font-bold text-purple-300 group-hover:text-purple-200">🍣 김밥천국 타이쿤</p>
+                                    <p class="text-gray-500 mt-1">빠르게 몰아치는 고객의 주문에 맞춰 정확히 김밥을 만드는 순발력 타이쿤!</p>
+                                </a>
+                                <div class="p-2.5 rounded-xl bg-gray-800/40 border border-gray-800">
+                                    <p class="font-bold text-pink-300">🧱 벽돌 깨기</p>
+                                    <p class="text-gray-500 mt-1">고전 오락실 아케이드 게임의 수유게임 버전. 아이템 획득이 클리어 열쇠!</p>
+                                </div>
+                                <div class="p-2.5 rounded-xl bg-gray-800/40 border border-gray-800">
+                                    <p class="font-bold text-green-300">🍎 과일 받기</p>
+                                    <p class="text-gray-500 mt-1">하늘에서 떨어지는 싱싱한 과일을 좌우로 움직여 담는 상큼 발랄 힐링 미니게임.</p>
+                                </div>
+                                <div class="p-2.5 rounded-xl bg-gray-800/40 border border-gray-800">
+                                    <p class="font-bold text-yellow-300">🔨 두더지 잡기</p>
+                                    <p class="text-gray-500 mt-1">빛나는 구멍에서 고개를 내미는 두더지들을 빠르고 정확하게 타격하는 피지컬 게임.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Ad or Community Banner -->
+                        <div class="bg-gradient-to-tr from-indigo-900/40 via-purple-900/40 to-pink-900/40 border border-purple-500/20 rounded-2xl p-5 relative overflow-hidden">
+                            <div class="absolute -right-8 -bottom-8 text-7xl text-purple-500/10"><i class="fa-solid fa-radiation"></i></div>
+                            <h4 class="font-bold text-white text-sm">수유 오락실 명맥</h4>
+                            <p class="text-xs text-purple-200 mt-1">전설의 수유 아케이드 원 및 수유게임 유저들을 위한 특별 채널입니다. 매너 플레이를 부탁드립니다!</p>
+                        </div>
+                    </div>
+
+                </div>
+
+            </main>
+        </div>
+
+    </div>
+
+    <!-- Firebase SDK Imports -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, 
+            signInWithCustomToken, 
+            signInAnonymously, 
+            GoogleAuthProvider,
+            signInWithCredential,
+            signOut, 
+            onAuthStateChanged 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            doc, 
+            setDoc, 
+            getDoc, 
+            collection, 
+            addDoc, 
+            query, 
+            onSnapshot, 
+            orderBy, 
+            limit, 
+            getDocs,
+            deleteDoc,
+            serverTimestamp 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global Variables provided by platform or fallback to user credentials
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'suyu-game-community-v1';
+        
+        // Use environment Firebase Config or user specified Firebase configuration
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            apiKey: "AIzaSyBiHlY3xM5y5K7V2_AlQH3YENGNMhK3RNk",
+            authDomain: "suyu-74792.firebaseapp.com",
+            projectId: "suyu-74792",
+            storageBucket: "suyu-74792.firebasestorage.app",
+            messagingSenderId: "308516702406",
+            appId: "1:308516702406:web:f331aa5fb6e86c97092fc7",
+            measurementId: "G-YCVCPD4WFF"
+        };
+
+        const googleClientId = "308516702406-657i3qibf9gfhjbe5gq30u5ajh5eufpk.apps.googleusercontent.com";
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Application State
+        let currentUser = null;
+        let userData = {
+            nickname: '',
+            avatar: 'fa-ghost', // 기본값
+            email: ''
+        };
+        let selectedAvatar = 'fa-ghost';
+
+        // Realtime Listeners Unsubscribe Functions
+        let unsubChat = null;
+        let unsubUsers = null;
+        let cleanupInterval = null;
+
+        // UI Elements
+        const loadingScreen = document.getElementById('loading-screen');
+        const authScreen = document.getElementById('auth-screen');
+        const mainScreen = document.getElementById('main-screen');
+        const stepLogin = document.getElementById('step-login');
+        const stepProfile = document.getElementById('step-profile');
+        const avatarGrid = document.getElementById('avatar-grid');
+        const inputNickname = document.getElementById('input-nickname');
+        const btnSubmitProfile = document.getElementById('btn-submit-profile');
+        const btnLogout = document.getElementById('btn-logout');
+        
+        // Navigation & Views
+        const navChat = document.getElementById('nav-btn-chat');
+        const navBoard = document.getElementById('nav-btn-board');
+        const navChatMob = document.getElementById('nav-btn-chat-mob');
+        const navBoardMob = document.getElementById('nav-btn-board-mob');
+        const viewChat = document.getElementById('view-chat');
+        const viewBoard = document.getElementById('view-board');
+
+        // Chat UI Elements
+        const chatForm = document.getElementById('chat-form');
+        const chatInput = document.getElementById('chat-input');
+        const chatMessages = document.getElementById('chat-messages');
+        const usersList = document.getElementById('users-list');
+        const onlineCount = document.getElementById('online-count');
+        const activeUserCounter = document.getElementById('active-user-counter');
+
+        // Board UI Elements
+        const postForm = document.getElementById('post-form');
+        const postTitle = document.getElementById('post-title');
+        const postGameTag = document.getElementById('post-game-tag');
+        const postContent = document.getElementById('post-content');
+        const postsContainer = document.getElementById('posts-container');
+        const btnRefreshPosts = document.getElementById('btn-refresh-posts');
+
+        // Confirmation Modal Logic (Eliminates confirm())
+        let onConfirmCallback = null;
+        function showConfirm(title, message, callback) {
+            document.getElementById('confirm-modal-title').innerText = title;
+            document.getElementById('confirm-modal-msg').innerText = message;
+            document.getElementById('confirm-modal').classList.remove('hidden');
+            onConfirmCallback = callback;
+        }
+
+        document.getElementById('btn-confirm-cancel').addEventListener('click', () => {
+            document.getElementById('confirm-modal').classList.add('hidden');
+            onConfirmCallback = null;
+        });
+
+        document.getElementById('btn-confirm-ok').addEventListener('click', () => {
+            document.getElementById('confirm-modal').classList.add('hidden');
+            if (onConfirmCallback) {
+                onConfirmCallback();
+            }
+            onConfirmCallback = null;
+        });
+
+        // Utility: Show Custom Toast Notification (Eliminates alert())
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toast-msg');
+            const toastIcon = document.getElementById('toast-icon');
+
+            toastMsg.innerText = message;
+            
+            if (type === 'error') {
+                toast.className = "fixed top-5 right-5 z-50 transform translate-y-0 opacity-100 transition-all duration-300 bg-gray-900 border-l-4 border-red-500 text-white px-6 py-4 rounded-lg shadow-2xl flex items-center gap-3";
+                toastIcon.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-red-500"></i>`;
+            } else if (type === 'success') {
+                toast.className = "fixed top-5 right-5 z-50 transform translate-y-0 opacity-100 transition-all duration-300 bg-gray-900 border-l-4 border-green-500 text-white px-6 py-4 rounded-lg shadow-2xl flex items-center gap-3";
+                toastIcon.innerHTML = `<i class="fa-solid fa-circle-check text-green-500"></i>`;
+            } else {
+                toast.className = "fixed top-5 right-5 z-50 transform translate-y-0 opacity-100 transition-all duration-300 bg-gray-900 border-l-4 border-purple-500 text-white px-6 py-4 rounded-lg shadow-2xl flex items-center gap-3";
+                toastIcon.innerHTML = `<i class="fa-solid fa-bell text-purple-400"></i>`;
+            }
+
+            toast.style.transform = "translateY(0)";
+            toast.style.opacity = "1";
+
+            setTimeout(() => {
+                toast.style.transform = "translateY(-100px)";
+                toast.style.opacity = "0";
+            }, 3000);
+        }
+
+        // Exponential Backoff API Wrapper
+        async function runWithRetry(fn, maxRetries = 5) {
+            let delay = 1000;
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    return await fn();
+                } catch (error) {
+                    if (i === maxRetries - 1) throw error;
+                    await new Promise(res => setTimeout(res, delay));
+                    delay *= 2;
+                }
+            }
+        }
+
+        // Initialize Google Sign-In Button with GSI library programmatically
+        const initGoogleSignInButton = () => {
+            if (typeof google !== 'undefined' && google.accounts) {
+                try {
+                    google.accounts.id.initialize({
+                        client_id: googleClientId,
+                        callback: async (response) => {
+                            showLoading();
+                            try {
+                                const credential = GoogleAuthProvider.credential(response.credential);
+                                await signInWithCredential(auth, credential);
+                                showToast("구글 로그인을 성공했습니다!", "success");
+                            } catch (err) {
+                                console.error("Google Credential Sign In error:", err);
+                                showToast("구글 로그인 인증 등록에 실패했습니다. Firebase 콘솔 설정을 확인하세요.", "error");
+                                hideLoading();
+                            }
+                        }
+                    });
+
+                    google.accounts.id.renderButton(
+                        document.getElementById("btn-google-login-container"),
+                        { 
+                            theme: "filled_blue", 
+                            size: "large", 
+                            width: "300", 
+                            shape: "pill", 
+                            text: "continue_with" 
+                        }
+                    );
+                } catch (e) {
+                    console.error("GSI Button initialization error:", e);
+                }
+            } else {
+                // If script hasn't loaded yet, check again soon
+                setTimeout(initGoogleSignInButton, 150);
+            }
+        };
+
+        // Initialize App & Authenticate (RULE 3 - Must Auth before queries)
+        const initAuth = async () => {
             try {
-                if (typeof lucide !== 'undefined' && lucide.createIcons) {
-                    lucide.createIcons();
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    // Start Anonymous Auth immediately so queries don't fail initially (Rule 3),
+                    // but our app UI router will strictly treat anonymous users as "Not Authenticated".
+                    await signInAnonymously(auth);
                 }
             } catch (e) {
-                console.warn('Lucide icon rendering skipped:', e);
+                console.error("Auth initialization failed:", e);
+                showToast("인증 서버 연결에 에러가 발생했습니다.", "error");
+            } finally {
+                hideLoading();
             }
-        }
-
-        // --- 1. 유니코드 체스 기물 매핑 (렌더링용) ---
-        const PIECE_UNICODE = {
-            'w_p': '♟', 'w_r': '♜', 'w_n': '♞', 'w_b': '♝', 'w_q': '♛', 'w_k': '♚',
-            'b_p': '♟', 'b_r': '♜', 'b_n': '♞', 'b_b': '♝', 'b_q': '♛', 'b_k': '♚'
         };
 
-        const PIECE_COLOR_CLASS = {
-            'w': 'text-amber-100 drop-shadow-[0_2px_3px_rgba(0,0,0,0.8)] font-bold',
-            'b': 'text-slate-950 drop-shadow-[0_1px_1px_rgba(255,255,255,0.4)] font-bold'
-        };
+        // Initialize Authentication & UI Button on load
+        initAuth();
+        initGoogleSignInButton();
 
-        // --- 2. 체스 평가 가중치 (PST: Piece-Square Tables) for AI ---
-        const PAWN_PST = [
-            [0,  0,  0,  0,  0,  0,  0,  0],
-            [50, 50, 50, 50, 50, 50, 50, 50],
-            [10, 10, 20, 30, 30, 20, 10, 10],
-            [5,  5, 10, 25, 25, 10,  5,  5],
-            [0,  0,  0, 20, 20,  0,  0,  0],
-            [5, -5,-10,  0,  0,-10, -5,  5],
-            [5, 10, 10,-20,-20, 10, 10,  5],
-            [0,  0,  0,  0,  0,  0,  0,  0]
-        ];
-
-        const KNIGHT_PST = [
-            [-50,-40,-30,-30,-30,-30,-40,-50],
-            [-40,-20,  0,  0,  0,  0,-20,-40],
-            [-30,  0, 10, 15, 15, 10,  0,-30],
-            [-30,  5, 15, 20, 20, 15,  5,-30],
-            [-30,  0, 15, 20, 20, 15,  0,-30],
-            [-30,  5, 10, 15, 15, 10,  5,-30],
-            [-40,-20,  0,  5,  5,  0,-20,-40],
-            [-50,-40,-30,-30,-30,-30,-40,-50]
-        ];
-
-        const BISHOP_PST = [
-            [-20,-10,-10,-10,-10,-10,-10,-20],
-            [-10,  0,  0,  0,  0,  0,  0,-10],
-            [-10,  0,  5, 10, 10,  5,  0,-10],
-            [-10,  5,  5, 10, 10,  5,  5,-10],
-            [-10,  0, 10, 10, 10, 10,  0,-10],
-            [-10, 10, 10, 10, 10, 10, 10,-10],
-            [-10,  5,  0,  0,  0,  0,  5,-10],
-            [-20,-10,-10,-10,-10,-10,-10,-20]
-        ];
-
-        const ROOK_PST = [
-            [0,  0,  0,  0,  0,  0,  0,  0],
-            [5, 10, 10, 10, 10, 10, 10,  5],
-            [-5,  0,  0,  0,  0,  0,  0, -5],
-            [-5,  0,  0,  0,  0,  0,  0, -5],
-            [-5,  0,  0,  0,  0,  0,  0, -5],
-            [-5,  0,  0,  0,  0,  0,  0, -5],
-            [-5,  0,  0,  0,  0,  0,  0, -5],
-            [0,  0,  0,  5,  5,  0,  0,  0]
-        ];
-
-        const QUEEN_PST = [
-            [-20,-10,-10, -5, -5,-10,-10,-20],
-            [-10,  0,  0,  0,  0,  0,  0,-10],
-            [-10,  0,  5,  5,  5,  5,  0,-10],
-            [-5,  0,  5,  5,  5,  5,  0, -5],
-            [0,  0,  5,  5,  5,  5,  0, -5],
-            [-10,  5,  5,  5,  5,  5,  0,-10],
-            [-10,  0,  5,  0,  0,  5,  0,-10],
-            [-20,-10,-10, -5, -5,-10,-10,-20]
-        ];
-
-        const KING_MIDGAME_PST = [
-            [-30,-40,-40,-50,-50,-40,-40,-30],
-            [-30,-40,-40,-50,-50,-40,-40,-30],
-            [-30,-40,-40,-50,-50,-40,-40,-30],
-            [-30,-40,-40,-50,-50,-40,-40,-30],
-            [-20,-30,-30,-40,-40,-30,-30,-20],
-            [-10,-20,-20,-20,-20,-20,-20,-10],
-            [20, 20,  0,  0,  0,  0, 20, 20],
-            [20, 30, 10,  0,  0, 10, 30, 20]
-        ];
-
-        // --- 3. 체스 상태 관리 엔진 ---
-        class ChessEngine {
-            constructor() {
-                this.reset();
+        // Listen for Auth State changes - Strictly enforce 구글 로그인 (익명 차단)
+        onAuthStateChanged(auth, async (user) => {
+            // isAnonymous === true 인 경우 무조건 로그인 화면으로 강제 이동 처리
+            if (user && !user.isAnonymous) {
+                currentUser = user;
+                await checkUserProfile(user.uid);
+            } else {
+                currentUser = null;
+                showAuthScreen(true); // 무조건 구글 로그인 화면으로 강제 유도
             }
+        });
 
-            reset() {
-                this.board = Array(8).fill(null).map(() => Array(8).fill(null));
-                this.turn = 'w';
-                this.moveHistory = [];
+        // Hide Loading Animation
+        function hideLoading() {
+            loadingScreen.classList.add('opacity-0');
+            setTimeout(() => {
+                loadingScreen.classList.add('hidden');
+            }, 500);
+        }
+
+        // Show Loading Animation
+        function showLoading() {
+            loadingScreen.classList.remove('hidden');
+            loadingScreen.classList.remove('opacity-0');
+        }
+
+        // View Router
+        function switchView(target) {
+            if (target === 'chat') {
+                viewChat.classList.remove('hidden');
+                viewBoard.classList.add('hidden');
+                navChat.className = "nav-tab active px-4 py-2 rounded-lg bg-purple-900/40 text-purple-300 font-medium text-sm border border-purple-500/20 flex items-center gap-2 transition";
+                navChatMob.className = "nav-tab flex-1 py-2 rounded-lg bg-purple-900/40 text-purple-300 font-medium text-xs flex items-center justify-center gap-2";
+                navBoard.className = "nav-tab px-4 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800/60 font-medium text-sm flex items-center gap-2 transition";
+                navBoardMob.className = "nav-tab flex-1 py-2 rounded-lg text-gray-400 font-medium text-xs flex items-center justify-center gap-2";
                 
-                this.castleRights = {
-                    w: { kingSide: true, queenSide: true },
-                    b: { kingSide: true, queenSide: true }
-                };
+                setTimeout(() => {
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                }, 100);
+            } else if (target === 'board') {
+                viewChat.classList.add('hidden');
+                viewBoard.classList.remove('hidden');
+                navBoard.className = "nav-tab active px-4 py-2 rounded-lg bg-purple-900/40 text-purple-300 font-medium text-sm border border-purple-500/20 flex items-center gap-2 transition";
+                navBoardMob.className = "nav-tab flex-1 py-2 rounded-lg bg-purple-900/40 text-purple-300 font-medium text-xs flex items-center justify-center gap-2";
+                navChat.className = "nav-tab px-4 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800/60 font-medium text-sm flex items-center gap-2 transition";
+                navChatMob.className = "nav-tab flex-1 py-2 rounded-lg text-gray-400 font-medium text-xs flex items-center justify-center gap-2";
                 
-                this.enPassantTarget = null;
-                this.halfMoveClock = 0;
-                this.fullMoveNumber = 1;
-
-                this.capturedPieces = { w: [], b: [] };
-                this.setupStandardBoard();
-            }
-
-            setupStandardBoard() {
-                const backRow = ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'];
-                for (let c = 0; c < 8; c++) {
-                    this.board[0][c] = { type: backRow[c], color: 'b' };
-                    this.board[1][c] = { type: 'p', color: 'b' };
-                    
-                    this.board[6][c] = { type: 'p', color: 'w' };
-                    this.board[7][c] = { type: backRow[c], color: 'w' };
-                }
-            }
-
-            clone() {
-                const cloneEngine = new ChessEngine();
-                cloneEngine.board = this.board.map(row => row.map(cell => cell ? { ...cell } : null));
-                cloneEngine.turn = this.turn;
-                cloneEngine.castleRights = {
-                    w: { ...this.castleRights.w },
-                    b: { ...this.castleRights.b }
-                };
-                cloneEngine.enPassantTarget = this.enPassantTarget ? { ...this.enPassantTarget } : null;
-                cloneEngine.halfMoveClock = this.halfMoveClock;
-                cloneEngine.fullMoveNumber = this.fullMoveNumber;
-                cloneEngine.capturedPieces = {
-                    w: [...this.capturedPieces.w],
-                    b: [...this.capturedPieces.b]
-                };
-                return cloneEngine;
-            }
-
-            getPiece(r, c) {
-                if (r < 0 || r > 7 || c < 0 || c > 7) return null;
-                return this.board[r][c];
-            }
-
-            setPiece(r, c, piece) {
-                this.board[r][c] = piece;
-            }
-
-            getPseudoLegalMoves(r, c) {
-                const piece = this.getPiece(r, c);
-                if (!piece) return [];
-
-                let moves = [];
-                const color = piece.color;
-                const oppColor = color === 'w' ? 'b' : 'w';
-
-                switch (piece.type) {
-                    case 'p': {
-                        const dir = color === 'w' ? -1 : 1;
-                        const startRow = color === 'w' ? 6 : 1;
-
-                        if (!this.getPiece(r + dir, c)) {
-                            moves.push({ from: { r, c }, to: { r: r + dir, c } });
-                            if (r === startRow && !this.getPiece(r + dir * 2, c)) {
-                                moves.push({ from: { r, c }, to: { r: r + dir * 2, c } });
-                            }
-                        }
-
-                        const captureOffsets = [-1, 1];
-                        for (let dc of captureOffsets) {
-                            const target = this.getPiece(r + dir, c + dc);
-                            if (target && target.color === oppColor) {
-                                moves.push({ from: { r, c }, to: { r: r + dir, c: c + dc } });
-                            }
-                            if (this.enPassantTarget && this.enPassantTarget.r === r + dir && this.enPassantTarget.c === c + dc) {
-                                moves.push({ from: { r, c }, to: { r: r + dir, c: c + dc }, isEnPassant: true });
-                            }
-                        }
-                        break;
-                    }
-                    case 'n': {
-                        const offsets = [
-                            [-2, -1], [-2, 1], [-1, -2], [-1, 2],
-                            [1, -2], [1, 2], [2, -1], [2, 1]
-                        ];
-                        for (let [dr, dc] of offsets) {
-                            const tr = r + dr;
-                            const tc = c + dc;
-                            const target = this.getPiece(tr, tc);
-                            if (tr >= 0 && tr < 8 && tc >= 0 && tc < 8) {
-                                if (!target || target.color === oppColor) {
-                                    moves.push({ from: { r, c }, to: { r: tr, c: tc } });
-                                }
-                            }
-                        }
-                        break;
-                    }
-                    case 'b':
-                        moves = moves.concat(this.getSlidingMoves(r, c, [[-1, -1], [-1, 1], [1, -1], [1, 1]]));
-                        break;
-                    case 'r':
-                        moves = moves.concat(this.getSlidingMoves(r, c, [[-1, 0], [1, 0], [0, -1], [0, 1]]));
-                        break;
-                    case 'q':
-                        moves = moves.concat(this.getSlidingMoves(r, c, [
-                            [-1, -1], [-1, 1], [1, -1], [1, 1],
-                            [-1, 0], [1, 0], [0, -1], [0, 1]
-                        ]));
-                        break;
-                    case 'k': {
-                        const offsets = [
-                            [-1, -1], [-1, 0], [-1, 1],
-                            [0, -1],           [0, 1],
-                            [1, -1],  [1, 0],  [1, 1]
-                        ];
-                        for (let [dr, dc] of offsets) {
-                            const tr = r + dr;
-                            const tc = c + dc;
-                            const target = this.getPiece(tr, tc);
-                            if (tr >= 0 && tr < 8 && tc >= 0 && tc < 8) {
-                                if (!target || target.color === oppColor) {
-                                    moves.push({ from: { r, c }, to: { r: tr, c: tc } });
-                                }
-                            }
-                        }
-                        moves = moves.concat(this.getCastleMoves(r, c));
-                        break;
-                    }
-                }
-
-                return moves;
-            }
-
-            getSlidingMoves(r, c, directions) {
-                const moves = [];
-                const piece = this.getPiece(r, c);
-                const oppColor = piece.color === 'w' ? 'b' : 'w';
-
-                for (let [dr, dc] of directions) {
-                    let tr = r + dr;
-                    let tc = c + dc;
-                    while (tr >= 0 && tr < 8 && tc >= 0 && tc < 8) {
-                        const target = this.getPiece(tr, tc);
-                        if (!target) {
-                            moves.push({ from: { r, c }, to: { r: tr, c: tc } });
-                        } else {
-                            if (target.color === oppColor) {
-                                moves.push({ from: { r, c }, to: { r: tr, c: tc } });
-                            }
-                            break;
-                        }
-                        tr += dr;
-                        tc += dc;
-                    }
-                }
-                return moves;
-            }
-
-            getCastleMoves(r, c) {
-                const moves = [];
-                const piece = this.getPiece(r, c);
-                const color = piece.color;
-                const rights = this.castleRights[color];
-                if (!rights.kingSide && !rights.queenSide) return [];
-                if (this.isInCheck(color)) return [];
-
-                if (rights.kingSide) {
-                    const c1 = this.getPiece(r, 5);
-                    const c2 = this.getPiece(r, 6);
-                    if (!c1 && !c2) {
-                        if (!this.isSquareAttacked(r, 5, color) && !this.isSquareAttacked(r, 6, color)) {
-                            moves.push({ from: { r, c }, to: { r, c: 6 }, isCastle: 'k' });
-                        }
-                    }
-                }
-
-                if (rights.queenSide) {
-                    const c1 = this.getPiece(r, 3);
-                    const c2 = this.getPiece(r, 2);
-                    const c3 = this.getPiece(r, 1);
-                    if (!c1 && !c2 && !c3) {
-                        if (!this.isSquareAttacked(r, 3, color) && !this.isSquareAttacked(r, 2, color)) {
-                            moves.push({ from: { r, c }, to: { r, c: 2 }, isCastle: 'q' });
-                        }
-                    }
-                }
-
-                return moves;
-            }
-
-            isSquareAttacked(r, c, myColor) {
-                const oppColor = myColor === 'w' ? 'b' : 'w';
-                for (let tr = 0; tr < 8; tr++) {
-                    for (let tc = 0; tc < 8; tc++) {
-                        const piece = this.getPiece(tr, tc);
-                        if (piece && piece.color === oppColor) {
-                            if (piece.type === 'p') {
-                                const dir = oppColor === 'w' ? -1 : 1;
-                                if (tr + dir === r && (tc - 1 === c || tc + 1 === c)) {
-                                    return true;
-                                }
-                            } else if (piece.type === 'k') {
-                                const dr = Math.abs(tr - r);
-                                const dc = Math.abs(tc - c);
-                                if (dr <= 1 && dc <= 1) return true;
-                            } else {
-                                const moves = this.getPseudoLegalMoves(tr, tc);
-                                if (moves.some(m => m.to.r === r && m.to.c === c)) {
-                                    return true;
-                                }
-                            }
-                        }
-                    }
-                }
-                return false;
-            }
-
-            findKing(color) {
-                for (let r = 0; r < 8; r++) {
-                    for (let c = 0; c < 8; c++) {
-                        const piece = this.getPiece(r, c);
-                        if (piece && piece.type === 'k' && piece.color === color) {
-                            return { r, c };
-                        }
-                    }
-                }
-                return null;
-            }
-
-            isInCheck(color) {
-                const kingPos = this.findKing(color);
-                if (!kingPos) return false;
-                return this.isSquareAttacked(kingPos.r, kingPos.c, color);
-            }
-
-            getLegalMoves(r, c) {
-                const piece = this.getPiece(r, c);
-                if (!piece || piece.color !== this.turn) return [];
-
-                const pseudoMoves = this.getPseudoLegalMoves(r, c);
-                const legalMoves = [];
-
-                for (let move of pseudoMoves) {
-                    const tempEngine = this.clone();
-                    tempEngine.executeMove(move, 'q', true);
-                    if (!tempEngine.isInCheck(this.turn)) {
-                        legalMoves.push(move);
-                    }
-                }
-
-                return legalMoves;
-            }
-
-            getAllLegalMoves() {
-                const allMoves = [];
-                for (let r = 0; r < 8; r++) {
-                    for (let c = 0; c < 8; c++) {
-                        const piece = this.getPiece(r, c);
-                        if (piece && piece.color === this.turn) {
-                            allMoves.push(...this.getLegalMoves(r, c));
-                        }
-                    }
-                }
-                return allMoves;
-            }
-
-            executeMove(move, promotionType = 'q', isVirtual = false) {
-                const { from, to } = move;
-                const piece = this.getPiece(from.r, from.c);
-                const captured = this.getPiece(to.r, to.c);
-                
-                const stateSnapshot = {
-                    move,
-                    piece: { ...piece },
-                    captured: captured ? { ...captured } : null,
-                    castleRights: {
-                        w: { ...this.castleRights.w },
-                        b: { ...this.castleRights.b }
-                    },
-                    enPassantTarget: this.enPassantTarget ? { ...this.enPassantTarget } : null,
-                    halfMoveClock: this.halfMoveClock,
-                    fullMoveNumber: this.fullMoveNumber
-                };
-
-                let isEnPassantCaptured = false;
-                if (move.isEnPassant) {
-                    const dir = piece.color === 'w' ? 1 : -1;
-                    const epCapturedPiece = this.getPiece(to.r + dir, to.c);
-                    stateSnapshot.captured = epCapturedPiece ? { ...epCapturedPiece } : null;
-                    this.setPiece(to.r + dir, to.c, null);
-                    isEnPassantCaptured = true;
-                }
-
-                this.setPiece(to.r, to.c, piece);
-                this.setPiece(from.r, from.c, null);
-
-                if (!isVirtual) {
-                    if (captured) {
-                        this.capturedPieces[piece.color].push(captured.type);
-                    } else if (isEnPassantCaptured && stateSnapshot.captured) {
-                        this.capturedPieces[piece.color].push(stateSnapshot.captured.type);
-                    }
-                }
-
-                if (piece.type === 'p' && (to.r === 0 || to.r === 7)) {
-                    this.setPiece(to.r, to.c, { type: promotionType, color: piece.color });
-                    stateSnapshot.isPromotion = true;
-                }
-
-                if (move.isCastle) {
-                    const row = piece.color === 'w' ? 7 : 0;
-                    if (move.isCastle === 'k') {
-                        const rook = this.getPiece(row, 7);
-                        this.setPiece(row, 5, rook);
-                        this.setPiece(row, 7, null);
-                    } else if (move.isCastle === 'q') {
-                        const rook = this.getPiece(row, 0);
-                        this.setPiece(row, 3, rook);
-                        this.setPiece(row, 0, null);
-                    }
-                }
-
-                if (piece.type === 'k') {
-                    this.castleRights[piece.color].kingSide = false;
-                    this.castleRights[piece.color].queenSide = false;
-                }
-                if (piece.type === 'r') {
-                    if (from.r === (piece.color === 'w' ? 7 : 0)) {
-                        if (from.c === 7) this.castleRights[piece.color].kingSide = false;
-                        if (from.c === 0) this.castleRights[piece.color].queenSide = false;
-                    }
-                }
-                if (captured && captured.type === 'r') {
-                    const oppColor = piece.color === 'w' ? 'b' : 'w';
-                    const oppRookRow = oppColor === 'w' ? 7 : 0;
-                    if (to.r === oppRookRow) {
-                        if (to.c === 7) this.castleRights[oppColor].kingSide = false;
-                        if (to.c === 0) this.castleRights[oppColor].queenSide = false;
-                    }
-                }
-
-                if (piece.type === 'p' && Math.abs(to.r - from.r) === 2) {
-                    const midRow = (from.r + to.r) / 2;
-                    this.enPassantTarget = { r: midRow, c: from.c };
-                } else {
-                    this.enPassantTarget = null;
-                }
-
-                if (piece.type === 'p' || captured) {
-                    this.halfMoveClock = 0;
-                } else {
-                    this.halfMoveClock++;
-                }
-
-                if (this.turn === 'b') {
-                    this.fullMoveNumber++;
-                }
-
-                this.turn = this.turn === 'w' ? 'b' : 'w';
-                this.moveHistory.push(stateSnapshot);
-            }
-
-            undo() {
-                if (this.moveHistory.length === 0) return false;
-
-                const lastState = this.moveHistory.pop();
-                const { move, piece, captured } = lastState;
-                const { from, to } = move;
-
-                this.turn = this.turn === 'w' ? 'b' : 'w';
-                this.setPiece(from.r, from.c, piece);
-                this.setPiece(to.r, to.c, captured);
-
-                if (move.isEnPassant) {
-                    const dir = this.turn === 'w' ? 1 : -1;
-                    this.setPiece(to.r + dir, to.c, captured);
-                    this.setPiece(to.r, to.c, null);
-                }
-
-                if (captured || move.isEnPassant) {
-                    const pList = this.capturedPieces[this.turn];
-                    if (pList.length > 0) pList.pop();
-                }
-
-                if (move.isCastle) {
-                    const row = this.turn === 'w' ? 7 : 0;
-                    if (move.isCastle === 'k') {
-                        const rook = this.getPiece(row, 5);
-                        this.setPiece(row, 7, rook);
-                        this.setPiece(row, 5, null);
-                    } else if (move.isCastle === 'q') {
-                        const rook = this.getPiece(row, 3);
-                        this.setPiece(row, 0, rook);
-                        this.setPiece(row, 3, null);
-                    }
-                }
-
-                this.castleRights = lastState.castleRights;
-                this.enPassantTarget = lastState.enPassantTarget;
-                this.halfMoveClock = lastState.halfMoveClock;
-                this.fullMoveNumber = lastState.fullMoveNumber;
-
-                return true;
-            }
-
-            getGameResult() {
-                const legalMoves = this.getAllLegalMoves();
-                const isCheck = this.isInCheck(this.turn);
-
-                if (legalMoves.length === 0) {
-                    if (isCheck) {
-                        return { status: 'checkmate', winner: this.turn === 'w' ? 'b' : 'w' };
-                    } else {
-                        return { status: 'stalemate', winner: null };
-                    }
-                }
-
-                if (this.isInsufficientMaterial()) {
-                    return { status: 'insufficient', winner: null };
-                }
-
-                if (this.halfMoveClock >= 100) {
-                    return { status: '50moves', winner: null };
-                }
-
-                return null;
-            }
-
-            isInsufficientMaterial() {
-                let wPieces = [];
-                let bPieces = [];
-                for (let r = 0; r < 8; r++) {
-                    for (let c = 0; c < 8; c++) {
-                        const p = this.getPiece(r, c);
-                        if (p) {
-                            if (p.color === 'w') wPieces.push(p.type);
-                            else bPieces.push(p.type);
-                        }
-                    }
-                }
-
-                if (wPieces.length === 1 && bPieces.length === 1) return true;
-
-                if (wPieces.length === 1 && bPieces.length === 2) {
-                    if (bPieces.includes('b') || bPieces.includes('n')) return true;
-                }
-                if (bPieces.length === 1 && wPieces.length === 2) {
-                    if (wPieces.includes('b') || wPieces.includes('n')) return true;
-                }
-
-                if (wPieces.length === 2 && bPieces.length === 2) {
-                    if (wPieces.includes('b') && bPieces.includes('b')) {
-                        return true;
-                    }
-                }
-
-                return false;
+                loadPosts();
             }
         }
 
-        // --- 4. AI 에이전트 구현 (Minimax + Alpha Beta + Piece-Square Tables) ---
-        class ChessAI {
-            constructor(engine, difficulty = 2) {
-                this.engine = engine;
-                this.difficulty = difficulty;
-                
-                this.pieceValues = {
-                    'p': 100,
-                    'n': 320,
-                    'b': 330,
-                    'r': 500,
-                    'q': 900,
-                    'k': 20000
-                };
-            }
+        // Register Navigation Click Listeners
+        navChat.addEventListener('click', () => switchView('chat'));
+        navChatMob.addEventListener('click', () => switchView('chat'));
+        navBoard.addEventListener('click', () => switchView('board'));
+        navBoardMob.addEventListener('click', () => switchView('board'));
 
-            setDifficulty(difficulty) {
-                this.difficulty = parseInt(difficulty);
-            }
+        // Check if Private User document exists (RULE 1)
+        async function checkUserProfile(uid) {
+            try {
+                // Rule 1: Private user document path
+                const userDocRef = doc(db, 'artifacts', appId, 'users', uid, 'profile', 'info');
+                const userDoc = await runWithRetry(() => getDoc(userDocRef));
 
-            getBestMove() {
-                const legalMoves = this.engine.getAllLegalMoves();
-                if (legalMoves.length === 0) return null;
-
-                if (this.difficulty === 1 && Math.random() < 0.35) {
-                    return legalMoves[Math.floor(Math.random() * legalMoves.length)];
-                }
-
-                const depth = this.difficulty === 3 ? 3 : 2;
-                
-                let bestScore = -Infinity;
-                let bestMoves = [];
-
-                let alpha = -Infinity;
-                let beta = Infinity;
-
-                for (let move of legalMoves) {
-                    const tempBoard = this.engine.clone();
-                    tempBoard.executeMove(move, 'q', true);
-
-                    const score = -this.minimax(tempBoard, depth - 1, -beta, -alpha, tempBoard.turn === 'w');
-                    
-                    if (score > bestScore) {
-                        bestScore = score;
-                        bestMoves = [move];
-                    } else if (score === bestScore) {
-                        bestMoves.push(move);
-                    }
-
-                    alpha = Math.max(alpha, score);
-                    if (alpha >= beta) break;
-                }
-
-                return bestMoves[Math.floor(Math.random() * bestMoves.length)];
-            }
-
-            minimax(engine, depth, alpha, beta, isMaximizing) {
-                if (depth === 0) {
-                    return this.evaluateBoard(engine);
-                }
-
-                const legalMoves = engine.getAllLegalMoves();
-                if (legalMoves.length === 0) {
-                    const isCheck = engine.isInCheck(engine.turn);
-                    if (isCheck) {
-                        return -25000 - depth;
-                    } else {
-                        return 0;
+                if (userDoc.exists()) {
+                    userData = userDoc.data();
+                    showMainScreen();
+                } else {
+                    showAuthScreen(false); // Go to step 2: customize profile name & logo
+                    if (currentUser && currentUser.displayName) {
+                        inputNickname.value = currentUser.displayName.substring(0, 15);
                     }
                 }
-
-                let maxScore = -Infinity;
-
-                for (let move of legalMoves) {
-                    const temp = engine.clone();
-                    temp.executeMove(move, 'q', true);
-                    
-                    const score = -this.minimax(temp, depth - 1, -beta, -alpha, !isMaximizing);
-                    maxScore = Math.max(maxScore, score);
-                    alpha = Math.max(alpha, score);
-                    if (alpha >= beta) {
-                        break;
-                    }
-                }
-
-                return maxScore;
-            }
-
-            evaluateBoard(engine) {
-                let score = 0;
-                for (let r = 0; r < 8; r++) {
-                    for (let c = 0; c < 8; c++) {
-                        const piece = engine.getPiece(r, c);
-                        if (piece) {
-                            let val = this.pieceValues[piece.type];
-                            let pSqBonus = 0;
-
-                            switch (piece.type) {
-                                case 'p':
-                                    pSqBonus = piece.color === 'w' ? PAWN_PST[r][c] : PAWN_PST[7 - r][c];
-                                    break;
-                                case 'n':
-                                    pSqBonus = piece.color === 'w' ? KNIGHT_PST[r][c] : KNIGHT_PST[7 - r][c];
-                                    break;
-                                case 'b':
-                                    pSqBonus = piece.color === 'w' ? BISHOP_PST[r][c] : BISHOP_PST[7 - r][c];
-                                    break;
-                                case 'r':
-                                    pSqBonus = piece.color === 'w' ? ROOK_PST[r][c] : ROOK_PST[7 - r][c];
-                                    break;
-                                case 'q':
-                                    pSqBonus = piece.color === 'w' ? QUEEN_PST[r][c] : QUEEN_PST[7 - r][c];
-                                    break;
-                                case 'k':
-                                    pSqBonus = piece.color === 'w' ? KING_MIDGAME_PST[r][c] : KING_MIDGAME_PST[7 - r][c];
-                                    break;
-                            }
-
-                            const totalPieceValue = val + pSqBonus;
-                            if (piece.color === 'w') {
-                                score += totalPieceValue;
-                            } else {
-                                score -= totalPieceValue;
-                            }
-                        }
-                    }
-                }
-                return engine.turn === 'w' ? score : -score;
+            } catch (error) {
+                console.error("Error retrieving user profile:", error);
+                // Allow profile input screen as user fallback
+                showAuthScreen(false);
+            } finally {
+                hideLoading();
             }
         }
 
-        // --- 5. UI 바인딩 및 게임 라이프사이클 구현 ---
-        class ChessUI {
-            constructor() {
-                this.engine = new ChessEngine();
-                this.ai = new ChessAI(this.engine, 2);
+        // Avatar option selection logic
+        const avatarOpts = document.querySelectorAll('.avatar-opt');
+        avatarOpts.forEach(btn => {
+            btn.addEventListener('click', () => {
+                avatarOpts.forEach(b => {
+                    b.classList.remove('bg-purple-900/50', 'border-purple-500/30');
+                    b.classList.add('bg-gray-800', 'border-transparent');
+                });
+                btn.classList.remove('bg-gray-800', 'border-transparent');
+                btn.classList.add('bg-purple-900/50', 'border-purple-500/30');
+                selectedAvatar = btn.getAttribute('data-icon');
+            });
+        });
 
-                this.gameMode = 'vs-ai';
-                this.playerColor = 'w';
-                this.boardFlipped = false;
-
-                this.selectedSquare = null;
-                this.highlightedMoves = [];
-                this.pendingPromotionMove = null;
-
-                // DOM 요소 매핑
-                this.boardEl = document.getElementById('chess-board');
-                this.turnBadgeDesktopEl = document.getElementById('turn-badge-desktop');
-                this.turnBadgeMobileEl = document.getElementById('turn-badge-mobile');
-                this.turnBadgeMobileTextEl = document.getElementById('turn-badge-mobile-text');
-                this.statusMessageDesktopEl = document.getElementById('status-message-desktop');
-                
-                this.modeVsAiBtn = document.getElementById('mode-vs-ai');
-                this.modeVsLocalBtn = document.getElementById('mode-vs-local');
-                this.difficultyContainer = document.getElementById('ai-difficulty-container');
-                this.playerColorContainer = document.getElementById('player-color-container');
-                
-                this.btnUndo = document.getElementById('btn-undo');
-                this.btnFlip = document.getElementById('btn-flip');
-                this.btnNewGame = document.getElementById('btn-new-game');
-
-                this.opponentAvatar = document.getElementById('opponent-avatar');
-                this.opponentNameEl = document.getElementById('opponent-name');
-                this.opponentCapturedEl = document.getElementById('opponent-captured');
-                this.playerCapturedEl = document.getElementById('player-captured');
-
-                this.pgnListEl = document.getElementById('pgn-list');
-                this.pgnEmptyEl = document.getElementById('pgn-empty');
-                this.pgnScrollContainer = document.getElementById('pgn-scroll-container');
-
-                this.promotionOverlay = document.getElementById('promotion-overlay');
-                this.gameOverModal = document.getElementById('game-over-modal');
-                this.modalTitle = document.getElementById('modal-title');
-                this.modalDesc = document.getElementById('modal-desc');
-
-                this.playerTimerEl = document.getElementById('player-timer');
-                this.opponentTimerEl = document.getElementById('opponent-timer');
-                
-                // 모바일 드로어 전용 엘리먼트 매핑
-                this.panelSettings = document.getElementById('panel-settings');
-                this.panelPgn = document.getElementById('panel-pgn');
-                this.drawerOverlay = document.getElementById('drawer-overlay');
-
-                this.timers = { w: 600, b: 600 };
-                this.timerInterval = null;
-
-                this.initEventListeners();
-                this.startNewGame();
+        // Submit Profile Customizations
+        btnSubmitProfile.addEventListener('click', async () => {
+            const nickname = inputNickname.value.trim();
+            if (!nickname) {
+                showToast("닉네임을 반드시 입력해야 합니다.", "error");
+                return;
             }
 
-            initEventListeners() {
-                this.modeVsAiBtn.addEventListener('click', () => this.setGameMode('vs-ai'));
-                this.modeVsLocalBtn.addEventListener('click', () => this.setGameMode('vs-local'));
+            showLoading();
+            try {
+                userData = {
+                    nickname: nickname,
+                    avatar: selectedAvatar,
+                    email: currentUser.email || '',
+                    updatedAt: new Date().toISOString()
+                };
 
-                document.querySelectorAll('.difficulty-btn').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        document.querySelectorAll('.difficulty-btn').forEach(b => b.classList.replace('bg-indigo-600', 'bg-slate-800'));
-                        document.querySelectorAll('.difficulty-btn').forEach(b => b.classList.replace('text-white', 'text-slate-300'));
-                        
-                        e.currentTarget.classList.replace('bg-slate-800', 'bg-indigo-600');
-                        e.currentTarget.classList.replace('text-slate-300', 'text-white');
-                        
-                        const level = e.currentTarget.getAttribute('data-level');
-                        this.ai.setDifficulty(level);
-                        this.updateOpponentProfile();
+                // Rule 1: Store private user profile configuration
+                const userDocRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'profile', 'info');
+                await runWithRetry(() => setDoc(userDocRef, userData));
+
+                // Rule 1: Set user to global public users database so they appear in online list
+                const publicUserRef = doc(db, 'artifacts', appId, 'public', 'data', 'onlineUsers', currentUser.uid);
+                await runWithRetry(() => setDoc(publicUserRef, {
+                    nickname: nickname,
+                    avatar: selectedAvatar,
+                    uid: currentUser.uid,
+                    lastActive: serverTimestamp()
+                }));
+
+                showToast(`반가워요, ${nickname} 게이머님!`, "success");
+                showMainScreen();
+            } catch (err) {
+                console.error("Error setting up profile:", err);
+                showToast("프로필 등록에 오류가 발생했습니다.", "error");
+            } finally {
+                hideLoading();
+            }
+        });
+
+        // Screen switching toggles
+        function showAuthScreen(showLoginStep = true) {
+            authScreen.classList.remove('hidden');
+            mainScreen.classList.add('hidden');
+            if (showLoginStep) {
+                stepLogin.classList.remove('hidden');
+                stepProfile.classList.add('hidden');
+            } else {
+                stepLogin.classList.add('hidden');
+                stepProfile.classList.remove('hidden');
+            }
+            stopRealtimeListeners();
+        }
+
+        function showMainScreen() {
+            authScreen.classList.add('hidden');
+            mainScreen.classList.remove('hidden');
+            
+            document.getElementById('nav-user-name').innerText = userData.nickname || 'Unknown Gamer';
+            document.getElementById('nav-user-avatar').innerHTML = `<i class="fa-solid ${userData.avatar || 'fa-ghost'}"></i>`;
+
+            startRealtimeListeners();
+            switchView('chat');
+        }
+
+        // Sign Out Logic - Replaced confirm() with custom showConfirm Modal
+        btnLogout.addEventListener('click', () => {
+            showConfirm("로그아웃", "정말로 수유게임 커뮤니티에서 로그아웃 하시겠습니까?", async () => {
+                showLoading();
+                try {
+                    if (currentUser) {
+                        try {
+                            const publicUserRef = doc(db, 'artifacts', appId, 'public', 'data', 'onlineUsers', currentUser.uid);
+                            await setDoc(publicUserRef, { status: 'offline', lastActive: serverTimestamp() }, { merge: true });
+                        } catch(e) {}
+                    }
+                    await signOut(auth);
+                    showToast("성공적으로 로그아웃 되었습니다.", "success");
+                } catch(e) {
+                    showToast("로그아웃 도중 오류가 발생했습니다.", "error");
+                } finally {
+                    hideLoading();
+                }
+            });
+        });
+
+        // Stop all Firebase Realtime listeners
+        function stopRealtimeListeners() {
+            if (unsubChat) { unsubChat(); unsubChat = null; }
+            if (unsubUsers) { unsubUsers(); unsubUsers = null; }
+            if (cleanupInterval) { clearInterval(cleanupInterval); cleanupInterval = null; }
+        }
+
+        // Start Firebase Realtime Listeners (RULE 3 - Guards and Auth active check)
+        function startRealtimeListeners() {
+            if (!currentUser) return;
+
+            stopRealtimeListeners();
+
+            // 1. 실시간 채팅 메시지 리스너 (RULE 2: Simple query with limit)
+            const chatColRef = collection(db, 'artifacts', appId, 'public', 'data', 'chats');
+            const chatQuery = query(chatColRef, orderBy('createdAt', 'desc'), limit(50));
+
+            unsubChat = onSnapshot(chatQuery, (snapshot) => {
+                const messages = [];
+                snapshot.forEach((doc) => {
+                    messages.push({ id: doc.id, ...doc.data() });
+                });
+                
+                messages.reverse();
+                renderChatMessages(messages);
+            }, (error) => {
+                console.error("Chat snapshot error:", error);
+                showToast("실시간 채팅 동기화에 일시적인 장애가 있습니다.", "error");
+            });
+
+            // 2. 실시간 접속자 상태 동기화 & 모니터링 리스너
+            const onlineColRef = collection(db, 'artifacts', appId, 'public', 'data', 'onlineUsers');
+            const onlineQuery = query(onlineColRef, limit(100));
+
+            unsubUsers = onSnapshot(onlineQuery, (snapshot) => {
+                const users = [];
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    if (data && data.nickname && data.status !== 'offline') {
+                        users.push(data);
+                    }
+                });
+                renderOnlineUsers(users);
+            }, (error) => {
+                console.error("Online users snapshot error:", error);
+            });
+
+            updatePresenceHeartbeat();
+
+            // 15분 경과 데이터 정리 스케줄러 시작 (30초마다 검사)
+            cleanupOldMessages();
+            cleanupInterval = setInterval(cleanupOldMessages, 30000);
+        }
+
+        // 서버의 용량 최적화(1GB 제한)를 위한 15분 경과 메시지 자동 청소 알고리즘
+        async function cleanupOldMessages() {
+            if (!currentUser) return;
+            try {
+                const chatColRef = collection(db, 'artifacts', appId, 'public', 'data', 'chats');
+                const snapshot = await runWithRetry(() => getDocs(chatColRef));
+                const now = Date.now();
+                const fifteenMinutesAgo = now - 15 * 60 * 1000;
+                let deletedCount = 0;
+
+                const deletePromises = [];
+                snapshot.forEach((docSnap) => {
+                    const data = docSnap.data();
+                    if (data.createdAt) {
+                        const createdTime = data.createdAt.toDate ? data.createdAt.toDate().getTime() : new Date(data.createdAt).getTime();
+                        if (createdTime < fifteenMinutesAgo) {
+                            deletePromises.push(deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chats', docSnap.id)));
+                            deletedCount++;
+                        }
+                    }
+                });
+
+                if (deletedCount > 0) {
+                    await Promise.all(deletePromises);
+
+                    // 다수의 사용자가 동시에 삭제를 처리할 때 시스템 공지 도배를 막기 위해 중복 검사 (최근 30초 내에 등록 여부)
+                    const systemMessageExistsRecently = Array.from(snapshot.docs).some(docSnap => {
+                        const data = docSnap.data();
+                        if (data.senderUid === "system-bot" && data.createdAt) {
+                            const createdTime = data.createdAt.toDate ? data.createdAt.toDate().getTime() : new Date(data.createdAt).getTime();
+                            return (now - createdTime) < 30000;
+                        }
+                        return false;
                     });
-                });
 
-                document.getElementById('color-white').addEventListener('click', () => {
-                    this.playerColor = 'w';
-                    this.updateColorSelectionUI();
-                    this.startNewGame();
-                });
-                document.getElementById('color-black').addEventListener('click', () => {
-                    this.playerColor = 'b';
-                    this.updateColorSelectionUI();
-                    this.startNewGame();
-                });
-
-                this.btnUndo.addEventListener('click', () => this.undoMove());
-                this.btnFlip.addEventListener('click', () => this.flipBoard());
-                this.btnNewGame.addEventListener('click', () => this.startNewGame());
-
-                document.querySelectorAll('.promo-choice-btn').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        const type = e.currentTarget.getAttribute('data-promo');
-                        this.completePromotion(type);
-                    });
-                });
-
-                document.getElementById('modal-btn-restart').addEventListener('click', () => {
-                    this.hideGameOverModal();
-                    this.startNewGame();
-                });
-                document.getElementById('modal-btn-close').addEventListener('click', () => {
-                    this.hideGameOverModal();
-                });
-
-                // 모바일 전용 토글 이벤트 추가
-                document.getElementById('btn-toggle-settings').addEventListener('click', () => this.openDrawer('settings'));
-                document.getElementById('btn-toggle-pgn').addEventListener('click', () => this.openDrawer('pgn'));
-                
-                document.getElementById('btn-close-settings').addEventListener('click', () => this.closeDrawers());
-                document.getElementById('btn-close-pgn').addEventListener('click', () => this.closeDrawers());
-                this.drawerOverlay.addEventListener('click', () => this.closeDrawers());
-            }
-
-            // 모바일 드로어 서랍 열기
-            openDrawer(type) {
-                this.closeDrawers();
-                this.drawerOverlay.classList.remove('opacity-0', 'pointer-events-none');
-                this.drawerOverlay.classList.add('opacity-100');
-
-                if (type === 'settings') {
-                    this.panelSettings.classList.remove('-translate-x-full');
-                } else if (type === 'pgn') {
-                    this.panelPgn.classList.remove('translate-x-full');
-                }
-            }
-
-            // 모바일 드로어 전부 닫기
-            closeDrawers() {
-                this.drawerOverlay.classList.remove('opacity-100');
-                this.drawerOverlay.classList.add('opacity-0', 'pointer-events-none');
-                this.panelSettings.classList.add('-translate-x-full');
-                this.panelPgn.classList.add('translate-x-full');
-            }
-
-            setGameMode(mode) {
-                this.gameMode = mode;
-                if (mode === 'vs-ai') {
-                    this.modeVsAiBtn.classList.replace('text-slate-400', 'text-white');
-                    this.modeVsAiBtn.classList.add('bg-indigo-600');
-                    this.modeVsLocalBtn.classList.replace('text-white', 'text-slate-400');
-                    this.modeVsLocalBtn.classList.remove('bg-indigo-600');
-
-                    this.difficultyContainer.classList.remove('hidden');
-                    this.playerColorContainer.classList.remove('hidden');
-                } else {
-                    this.modeVsLocalBtn.classList.replace('text-slate-400', 'text-white');
-                    this.modeVsLocalBtn.classList.add('bg-indigo-600');
-                    this.modeVsAiBtn.classList.replace('text-white', 'text-slate-400');
-                    this.modeVsAiBtn.classList.remove('bg-indigo-600');
-
-                    this.difficultyContainer.classList.add('hidden');
-                    this.playerColorContainer.classList.add('hidden');
-                }
-                this.updateOpponentProfile();
-                this.startNewGame();
-                this.closeDrawers(); // 모드 선택 시 서랍 자동 닫기
-            }
-
-            updateColorSelectionUI() {
-                const wBtn = document.getElementById('color-white');
-                const bBtn = document.getElementById('color-black');
-
-                if (this.playerColor === 'w') {
-                    wBtn.classList.replace('border-transparent', 'border-indigo-500');
-                    bBtn.classList.replace('border-slate-700', 'border-transparent');
-                } else {
-                    bBtn.classList.replace('border-transparent', 'border-slate-700');
-                    wBtn.classList.replace('border-indigo-500', 'border-transparent');
-                }
-            }
-
-            updateOpponentProfile() {
-                if (this.gameMode === 'vs-ai') {
-                    this.opponentAvatar.innerHTML = '<i data-lucide="cpu" class="w-4 h-4"></i>';
-                    const diffText = this.ai.difficulty === 1 ? '쉬움' : this.ai.difficulty === 2 ? '보통' : '어려움';
-                    this.opponentNameEl.innerText = `인공지능 (Lv.${this.ai.difficulty} ${diffText})`;
-                    this.opponentAvatar.className = 'w-7 h-7 rounded-lg bg-purple-600/20 text-purple-400 flex items-center justify-center font-bold text-sm';
-                } else {
-                    this.opponentAvatar.innerHTML = '<i data-lucide="user" class="w-4 h-4"></i>';
-                    this.opponentNameEl.innerText = '상대 플레이어';
-                    this.opponentAvatar.className = 'w-7 h-7 rounded-lg bg-teal-600/20 text-teal-400 flex items-center justify-center font-bold text-sm';
-                }
-                safeCreateIcons();
-            }
-
-            startNewGame() {
-                this.engine.reset();
-                this.selectedSquare = null;
-                this.highlightedMoves = [];
-                this.pendingPromotionMove = null;
-
-                this.timers = { w: 600, b: 600 };
-                this.stopTimer();
-                this.startTimer();
-
-                if (this.gameMode === 'vs-ai' && this.playerColor === 'b') {
-                    this.boardFlipped = true;
-                } else {
-                    this.boardFlipped = false;
-                }
-
-                this.updateUI();
-
-                if (this.gameMode === 'vs-ai' && this.playerColor === 'b' && this.engine.turn === 'w') {
-                    setTimeout(() => this.triggerAIMove(), 500);
-                }
-            }
-
-            flipBoard() {
-                this.boardFlipped = !this.boardFlipped;
-                this.renderBoard();
-            }
-
-            startTimer() {
-                this.updateTimerDisplay();
-                this.timerInterval = setInterval(() => {
-                    const activeTurn = this.engine.turn;
-                    if (this.timers[activeTurn] > 0) {
-                        this.timers[activeTurn]--;
-                        this.updateTimerDisplay();
-                    } else {
-                        this.stopTimer();
-                        const winner = activeTurn === 'w' ? 'b' : 'w';
-                        this.showGameOverModal('시간 초과', `${winner === 'w' ? '백색' : '흑색'} 플레이어가 시간이 남아 승리하였습니다.`);
-                    }
-                }, 1000);
-            }
-
-            stopTimer() {
-                if (this.timerInterval) {
-                    clearInterval(this.timerInterval);
-                    this.timerInterval = null;
-                }
-            }
-
-            updateTimerDisplay() {
-                const formatTime = (sec) => {
-                    const m = Math.floor(sec / 60).toString().padStart(2, '0');
-                    const s = (sec % 60).toString().padStart(2, '0');
-                    return `${m}:${s}`;
-                };
-
-                if (this.gameMode === 'vs-ai') {
-                    if (this.playerColor === 'w') {
-                        this.playerTimerEl.innerText = formatTime(this.timers.w);
-                        this.opponentTimerEl.innerText = formatTime(this.timers.b);
-                    } else {
-                        this.playerTimerEl.innerText = formatTime(this.timers.b);
-                        this.opponentTimerEl.innerText = formatTime(this.timers.w);
-                    }
-                } else {
-                    this.playerTimerEl.innerText = formatTime(this.timers.w);
-                    this.opponentTimerEl.innerText = formatTime(this.timers.b);
-                }
-            }
-
-            renderBoard() {
-                this.boardEl.innerHTML = '';
-                
-                const isCheck = this.engine.isInCheck(this.engine.turn);
-                const kingPos = isCheck ? this.engine.findKing(this.engine.turn) : null;
-                const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
-
-                for (let rIndex = 0; rIndex < 8; rIndex++) {
-                    const r = this.boardFlipped ? rIndex : 7 - rIndex;
-                    
-                    for (let cIndex = 0; cIndex < 8; cIndex++) {
-                        const c = this.boardFlipped ? 7 - cIndex : cIndex;
-                        
-                        const square = document.createElement('div');
-                        const isDark = (r + c) % 2 === 1;
-                        
-                        let squareClass = isDark ? 'bg-slate-700' : 'bg-slate-300';
-                        
-                        if (this.selectedSquare && this.selectedSquare.r === r && this.selectedSquare.c === c) {
-                            squareClass = 'bg-amber-400/90';
-                        }
-                        else if (kingPos && kingPos.r === r && kingPos.c === c) {
-                            squareClass = 'bg-rose-600/80 animate-pulse';
-                        }
-                        
-                        square.className = `${squareClass} w-full h-full flex items-center justify-center relative cursor-pointer select-none transition-colors duration-150`;
-                        square.dataset.row = r;
-                        square.dataset.col = c;
-
-                        // 기보 좌표 레이블 추가 (셀 내부 모서리)
-                        if (rIndex === 7) {
-                            const fileLabel = document.createElement('span');
-                            fileLabel.innerText = files[c];
-                            fileLabel.className = `absolute bottom-0.5 right-1 text-[9px] font-black tracking-tight ${isDark ? 'text-slate-400/80' : 'text-slate-600/80'} pointer-events-none`;
-                            square.appendChild(fileLabel);
-                        }
-                        if (cIndex === 0) {
-                            const rankLabel = document.createElement('span');
-                            rankLabel.innerText = r + 1;
-                            rankLabel.className = `absolute top-0.5 left-1 text-[9px] font-black tracking-tight ${isDark ? 'text-slate-400/80' : 'text-slate-600/80'} pointer-events-none`;
-                            square.appendChild(rankLabel);
-                        }
-
-                        // 기물 그리기
-                        const piece = this.engine.getPiece(r, c);
-                        if (piece) {
-                            const pieceSpan = document.createElement('span');
-                            const colorKey = `${piece.color}_${piece.type}`;
-                            pieceSpan.innerText = PIECE_UNICODE[colorKey] || '';
-                            // cqw 단위의 CSS 클래스를 매핑하여 해상도에 무조건 비례하는 기물 보장
-                            pieceSpan.className = `flex items-center justify-center chess-piece-symbol ${PIECE_COLOR_CLASS[piece.color]} z-10 transition-transform duration-200 hover:scale-110`;
-                            square.appendChild(pieceSpan);
-                        }
-
-                        // 경로 하이라이트 가이드
-                        const canMoveTo = this.highlightedMoves.find(m => m.to.r === r && m.to.c === c);
-                        if (canMoveTo) {
-                            const indicator = document.createElement('div');
-                            if (piece || canMoveTo.isEnPassant) {
-                                indicator.className = 'absolute w-5/6 h-5/6 border-[3px] md:border-4 border-rose-500 rounded-full z-20';
-                            } else {
-                                indicator.className = 'absolute w-3 h-3 sm:w-4 sm:h-4 bg-emerald-500/80 rounded-full z-20';
-                            }
-                            square.appendChild(indicator);
-                        }
-
-                        square.addEventListener('mousedown', () => this.handleSquareInteraction(r, c));
-                        square.addEventListener('touchstart', (e) => {
-                            e.preventDefault();
-                            this.handleSquareInteraction(r, c);
-                        }, { passive: false });
-
-                        this.boardEl.appendChild(square);
+                    if (!systemMessageExistsRecently) {
+                        await addDoc(chatColRef, {
+                            text: "All chats have been cleared.",
+                            senderName: "System",
+                            senderAvatar: "fa-robot",
+                            senderUid: "system-bot",
+                            createdAt: serverTimestamp()
+                        });
                     }
                 }
-            }
-
-            handleSquareInteraction(r, c) {
-                if (this.engine.getGameResult()) return;
-                if (this.gameMode === 'vs-ai' && this.engine.turn !== this.playerColor) return;
-
-                const clickedPiece = this.engine.getPiece(r, c);
-                const isPossibleMove = this.highlightedMoves.find(m => m.to.r === r && m.to.c === c);
-
-                if (isPossibleMove) {
-                    this.executeUserMove(isPossibleMove);
-                } else if (clickedPiece && clickedPiece.color === this.engine.turn) {
-                    this.selectedSquare = { r, c };
-                    this.highlightedMoves = this.engine.getLegalMoves(r, c);
-                    this.renderBoard();
-                } else {
-                    this.selectedSquare = null;
-                    this.highlightedMoves = [];
-                    this.renderBoard();
-                }
-            }
-
-            executeUserMove(move) {
-                const piece = this.engine.getPiece(move.from.r, move.from.c);
-
-                if (piece.type === 'p' && (move.to.r === 0 || move.to.r === 7)) {
-                    this.pendingPromotionMove = move;
-                    this.showPromotionDialog();
-                    return;
-                }
-
-                this.engine.executeMove(move);
-                this.onMoveCompleted();
-            }
-
-            showPromotionDialog() {
-                this.promotionOverlay.classList.remove('hidden');
-            }
-
-            completePromotion(type) {
-                this.promotionOverlay.classList.add('hidden');
-                if (this.pendingPromotionMove) {
-                    this.engine.executeMove(this.pendingPromotionMove, type);
-                    this.pendingPromotionMove = null;
-                    this.onMoveCompleted();
-                }
-            }
-
-            onMoveCompleted() {
-                this.selectedSquare = null;
-                this.highlightedMoves = [];
-                
-                if (navigator.vibrate) {
-                    navigator.vibrate(30);
-                }
-
-                this.updateUI();
-
-                const result = this.engine.getGameResult();
-                if (result) {
-                    this.stopTimer();
-                    this.handleGameEnded(result);
-                    return;
-                }
-
-                if (this.gameMode === 'vs-ai' && this.engine.turn !== this.playerColor) {
-                    setTimeout(() => this.triggerAIMove(), 400);
-                }
-            }
-
-            undoMove() {
-                if (this.gameMode === 'vs-ai') {
-                    if (this.engine.moveHistory.length >= 2) {
-                        this.engine.undo();
-                        this.engine.undo();
-                        this.selectedSquare = null;
-                        this.highlightedMoves = [];
-                        this.updateUI();
-                    }
-                } else {
-                    if (this.engine.undo()) {
-                        this.selectedSquare = null;
-                        this.highlightedMoves = [];
-                        this.updateUI();
-                    }
-                }
-            }
-
-            triggerAIMove() {
-                const bestMove = this.ai.getBestMove();
-                if (bestMove) {
-                    this.engine.executeMove(bestMove, 'q');
-                    
-                    if (navigator.vibrate) {
-                        navigator.vibrate(20);
-                    }
-                    
-                    this.updateUI();
-
-                    const result = this.engine.getGameResult();
-                    if (result) {
-                        this.stopTimer();
-                        this.handleGameEnded(result);
-                    }
-                }
-            }
-
-            handleGameEnded(result) {
-                let title = '게임 종료';
-                let desc = '';
-
-                if (result.status === 'checkmate') {
-                    const winnerName = result.winner === 'w' ? '백색(White)' : '흑색(Black)';
-                    title = '체크메이트! 외통수';
-                    desc = `훌륭한 전술로 ${winnerName}가 승리하였습니다.`;
-                } else if (result.status === 'stalemate') {
-                    title = '스테일메이트 (무승부)';
-                    desc = '움직일 수 있는 합법수가 없어 경기가 무승부로 종료되었습니다.';
-                } else if (result.status === 'insufficient') {
-                    title = '기물 부족 무승부';
-                    desc = '체크메이트를 유도할 수 있는 기물이 부족하여 자동 무승부 처리되었습니다.';
-                } else if (result.status === '50moves') {
-                    title = '50수 법칙 무승부';
-                    desc = '행마 진행 중 50수 동안 메이트나 전진이 없어 규정상 무승부입니다.';
-                }
-
-                this.showGameOverModal(title, desc);
-            }
-
-            showGameOverModal(title, desc) {
-                this.modalTitle.innerText = title;
-                this.modalDesc.innerText = desc;
-                this.gameOverModal.classList.remove('hidden');
-            }
-
-            hideGameOverModal() {
-                this.gameOverModal.classList.add('hidden');
-            }
-
-            updateUI() {
-                this.renderBoard();
-                this.updateHeaderBadges();
-                this.renderCapturedList();
-                this.renderPgn();
-                this.btnUndo.disabled = this.engine.moveHistory.length === 0;
-            }
-
-            updateHeaderBadges() {
-                const activeColor = this.engine.turn;
-                const isCheck = this.engine.isInCheck(activeColor);
-
-                // 데스크톱 전용 턴 정보 배지 업데이트
-                if (activeColor === 'w') {
-                    this.turnBadgeDesktopEl.innerHTML = '<span class="w-2.5 h-2.5 bg-white border border-slate-400 rounded-full inline-block"></span> 백색 차례';
-                    this.turnBadgeDesktopEl.className = 'flex items-center gap-1.5 font-bold px-2 py-0.5 rounded-full bg-white text-slate-950';
-                    
-                    // 모바일 전용 턴 정보 배지 동시 업뎃
-                    this.turnBadgeMobileTextEl.innerText = "백색 차례";
-                    this.turnBadgeMobileEl.className = 'lg:hidden flex items-center justify-center gap-1 px-2.5 bg-white rounded-xl text-[10px] font-black tracking-tight text-slate-950 border border-slate-300';
-                } else {
-                    this.turnBadgeDesktopEl.innerHTML = '<span class="w-2.5 h-2.5 bg-slate-950 border border-slate-600 rounded-full inline-block"></span> 흑색 차례';
-                    this.turnBadgeDesktopEl.className = 'flex items-center gap-1.5 font-bold px-2 py-0.5 rounded-full bg-slate-950 text-white border border-slate-700';
-                    
-                    // 모바일 전용 턴 정보 배지 동시 업뎃
-                    this.turnBadgeMobileTextEl.innerText = "흑색 차례";
-                    this.turnBadgeMobileEl.className = 'lg:hidden flex items-center justify-center gap-1 px-2.5 bg-slate-950 rounded-xl text-[10px] font-black tracking-tight text-white border border-slate-700';
-                }
-
-                // 체크 알림 메시지 분기 처리
-                if (isCheck) {
-                    this.statusMessageDesktopEl.innerHTML = '⚠️ 체크 상태!';
-                    this.statusMessageDesktopEl.className = 'text-center py-2 px-3 rounded-xl text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30';
-                } else {
-                    this.statusMessageDesktopEl.innerHTML = '안정적 경기 진행 중';
-                    this.statusMessageDesktopEl.className = 'text-center py-2 px-3 rounded-xl text-xs font-semibold bg-slate-900/50 text-slate-300';
-                }
-            }
-
-            renderCapturedList() {
-                this.playerCapturedEl.innerHTML = '';
-                this.opponentCapturedEl.innerHTML = '';
-
-                const whiteCaptured = this.engine.capturedPieces.w;
-                whiteCaptured.forEach(piece => {
-                    const el = document.createElement('span');
-                    el.innerText = PIECE_UNICODE[`b_${piece}`] || '';
-                    el.className = 'text-sm text-slate-400';
-                    this.playerCapturedEl.appendChild(el);
-                });
-
-                const blackCaptured = this.engine.capturedPieces.b;
-                blackCaptured.forEach(piece => {
-                    const el = document.createElement('span');
-                    el.innerText = PIECE_UNICODE[`w_${piece}`] || '';
-                    el.className = 'text-sm text-slate-400';
-                    this.opponentCapturedEl.appendChild(el);
-                });
-            }
-
-            renderPgn() {
-                this.pgnListEl.innerHTML = '';
-                const history = this.engine.moveHistory;
-                if (history.length === 0) {
-                    this.pgnEmptyEl.classList.remove('hidden');
-                    return;
-                }
-                
-                this.pgnEmptyEl.classList.add('hidden');
-
-                for (let i = 0; i < history.length; i += 2) {
-                    const turnIndex = Math.floor(i / 2) + 1;
-                    const wMove = history[i];
-                    const wText = this.getSanText(wMove);
-                    const bMove = history[i + 1];
-                    const bText = bMove ? this.getSanText(bMove) : '';
-
-                    const rowEl = document.createElement('div');
-                    rowEl.className = 'contents';
-
-                    const leftCol = document.createElement('span');
-                    leftCol.className = 'text-slate-400 font-bold';
-                    leftCol.innerText = `${turnIndex}. ${wText}`;
-
-                    const rightCol = document.createElement('span');
-                    rightCol.className = 'text-slate-300';
-                    rightCol.innerText = bText;
-
-                    rowEl.appendChild(leftCol);
-                    rowEl.appendChild(rightCol);
-                    this.pgnListEl.appendChild(rowEl);
-                }
-
-                this.pgnScrollContainer.scrollTop = this.pgnScrollContainer.scrollHeight;
-            }
-
-            getSanText(stateSnapshot) {
-                const { move, piece, captured, isPromotion } = stateSnapshot;
-                if (move.isCastle) {
-                    return move.isCastle === 'k' ? 'O-O' : 'O-O-O';
-                }
-                const cols = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
-                const pName = piece.type.toUpperCase() === 'P' ? '' : piece.type.toUpperCase();
-                const target = cols[move.to.c] + (8 - move.to.r);
-                const cap = captured ? 'x' : '';
-                const promo = isPromotion ? '=Q' : '';
-                return pName + cap + target + promo;
+            } catch (err) {
+                console.warn("메시지 자동 비우기 처리 에러:", err);
             }
         }
 
-        // 샌드박스 Iframe 누수 방지 이중 부트스트랩 스크립트
-        function initApp() {
-            safeCreateIcons();
-            window.chessUI = new ChessUI();
+        // Periodically ping online status
+        async function updatePresenceHeartbeat() {
+            if (!currentUser) return;
+            try {
+                const publicUserRef = doc(db, 'artifacts', appId, 'public', 'data', 'onlineUsers', currentUser.uid);
+                await setDoc(publicUserRef, {
+                    nickname: userData.nickname || 'Unknown Gamer',
+                    avatar: userData.avatar || 'fa-ghost',
+                    uid: currentUser.uid,
+                    lastActive: serverTimestamp(),
+                    status: 'online'
+                }, { merge: true });
+            } catch(e) {
+                console.warn("Heartbeat update missed:", e);
+            }
+            setTimeout(updatePresenceHeartbeat, 120000);
         }
 
-        if (document.readyState === 'complete' || document.readyState === 'interactive') {
-            initApp();
-        } else {
-            document.addEventListener('DOMContentLoaded', initApp);
+        // HTML safe escaping to prevent XSS injection
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text ? text.replace(/[&<>"']/g, function(m) { return map[m]; }) : '';
+        }
+
+        // Render chat messages inside UI
+        function renderChatMessages(messages) {
+            chatMessages.innerHTML = '';
+            
+            if (messages.length === 0) {
+                chatMessages.innerHTML = `
+                    <div class="flex flex-col items-center justify-center h-full text-gray-500">
+                        <i class="fa-solid fa-comments text-4xl mb-2 text-gray-700"></i>
+                        <p class="text-sm font-medium">채팅방이 비어있습니다.</p>
+                        <p class="text-xs">첫 대화를 남기고 수유 유저들과 소통을 시작해 보세요!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            messages.forEach((msg) => {
+                const isMyMessage = msg.senderUid === currentUser.uid;
+                const escText = escapeHtml(msg.text);
+                const escName = escapeHtml(msg.senderName);
+                const escAvatar = escapeHtml(msg.senderAvatar || 'fa-ghost');
+                
+                // 시스템 메시지는 채팅창의 가운데에 깔끔한 퍼플 네온 스타일 배지로 출력
+                if (msg.senderUid === "system-bot") {
+                    const systemHtml = `
+                        <div class="flex items-center justify-center my-2">
+                            <div class="bg-purple-950/40 text-purple-300 border border-purple-500/20 rounded-full px-4 py-1 text-[11px] font-medium tracking-wide flex items-center gap-1.5 shadow-md">
+                                <i class="fa-solid fa-robot text-purple-400"></i>
+                                <span>${escText}</span>
+                            </div>
+                        </div>
+                    `;
+                    chatMessages.innerHTML += systemHtml;
+                    return;
+                }
+
+                let timeStr = "오후";
+                if (msg.createdAt) {
+                    const d = msg.createdAt.toDate ? msg.createdAt.toDate() : new Date(msg.createdAt);
+                    timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                }
+
+                const msgHtml = isMyMessage ? `
+                    <div class="flex items-end justify-end gap-2.5">
+                        <span class="text-[10px] text-gray-500 mb-1">${timeStr}</span>
+                        <div class="flex flex-col gap-1 max-w-[70%]">
+                            <div class="bg-gradient-to-tr from-purple-600 to-indigo-600 text-white rounded-2xl rounded-tr-none px-4 py-2.5 text-sm shadow-md break-all">
+                                ${escText}
+                            </div>
+                        </div>
+                    </div>
+                ` : `
+                    <div class="flex gap-3">
+                        <div class="h-10 w-10 flex-shrink-0 rounded-xl bg-gray-800 border border-gray-700 flex items-center justify-center text-purple-400 text-base shadow-sm">
+                            <i class="fa-solid ${escAvatar}"></i>
+                        </div>
+                        <div class="flex flex-col gap-1 max-w-[70%]">
+                            <span class="text-xs font-bold text-gray-400">${escName} <span class="text-[9px] font-normal text-purple-400 ml-1">UID: ${msg.senderUid}</span></span>
+                            <div class="flex items-end gap-2.5">
+                                <div class="bg-gray-800 text-gray-100 rounded-2xl rounded-tl-none px-4 py-2.5 text-sm border border-gray-700/80 shadow-md break-all">
+                                    ${escText}
+                                </div>
+                                <span class="text-[10px] text-gray-500 mb-1">${timeStr}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                chatMessages.innerHTML += msgHtml;
+            });
+
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // Render Online Users List
+        function renderOnlineUsers(users) {
+            usersList.innerHTML = '';
+            onlineCount.innerText = users.length;
+            activeUserCounter.innerText = `온라인: ${users.length}명`;
+
+            if (users.length === 0) {
+                usersList.innerHTML = `<p class="text-xs text-gray-500 text-center py-4 w-full">접속자가 없습니다.</p>`;
+                return;
+            }
+
+            users.forEach((u) => {
+                const escName = escapeHtml(u.nickname);
+                const escAvatar = escapeHtml(u.avatar || 'fa-ghost');
+                const isMe = u.uid === currentUser.uid;
+
+                const userHtml = `
+                    <div class="flex items-center gap-2.5 p-2 rounded-xl bg-gray-800/40 hover:bg-gray-800 border border-transparent hover:border-gray-700/50 transition flex-shrink-0 md:flex-shrink">
+                        <div class="relative">
+                            <div class="h-8 w-8 rounded-lg bg-gray-700/60 border border-gray-600 flex items-center justify-center text-purple-300 text-sm">
+                                <i class="fa-solid ${escAvatar}"></i>
+                            </div>
+                            <span class="absolute bottom-[-2px] right-[-2px] h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-gray-900"></span>
+                        </div>
+                        <div class="text-left">
+                            <p class="text-xs font-bold text-gray-200 truncate max-w-[100px] sm:max-w-[140px]">${escName} ${isMe ? '<span class="text-[9px] text-pink-400 font-normal ml-0.5">(나)</span>' : ''}</p>
+                            <p class="text-[9px] text-gray-500 truncate max-w-[100px] sm:max-w-[140px]">UID: ${u.uid}</p>
+                        </div>
+                    </div>
+                `;
+                usersList.innerHTML += userHtml;
+            });
+        }
+
+        // Post chat message
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (!currentUser) {
+                showToast("인증이 만료되었습니다. 로그인을 다시 진행해주세요.", "error");
+                return;
+            }
+
+            const text = chatInput.value.trim();
+            if (!text) return;
+
+            chatInput.value = '';
+
+            try {
+                const chatColRef = collection(db, 'artifacts', appId, 'public', 'data', 'chats');
+                await addDoc(chatColRef, {
+                    text: text,
+                    senderName: userData.nickname || 'Unknown Gamer',
+                    senderAvatar: userData.avatar || 'fa-ghost',
+                    senderUid: currentUser.uid,
+                    createdAt: serverTimestamp()
+                });
+            } catch (err) {
+                console.error("Message send failure:", err);
+                showToast("실시간 채팅 전송에 실패했습니다.", "error");
+            }
+        });
+
+        // ----------------- BOARD LOGIC -----------------
+
+        // Add Post
+        postForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            if (!currentUser) {
+                showToast("포스트 작성을 하려면 로그인이 필요합니다.", "error");
+                return;
+            }
+
+            const title = postTitle.value.trim();
+            const tag = postGameTag.value;
+            const content = postContent.value.trim();
+
+            if (!title || !content) {
+                showToast("제목과 내용을 채워주세요.", "error");
+                return;
+            }
+
+            showLoading();
+
+            try {
+                const postsColRef = collection(db, 'artifacts', appId, 'public', 'data', 'posts');
+                await addDoc(postsColRef, {
+                    title: title,
+                    tag: tag,
+                    content: content,
+                    authorName: userData.nickname || 'Unknown Gamer',
+                    authorAvatar: userData.avatar || 'fa-ghost',
+                    authorUid: currentUser.uid,
+                    createdAt: serverTimestamp()
+                });
+
+                postTitle.value = '';
+                postContent.value = '';
+                
+                showToast("포스트가 공략 게시판에 정상적으로 등록되었습니다!", "success");
+                await loadPosts();
+            } catch (err) {
+                console.error("Failed to register post:", err);
+                showToast("공략 등록에 실패했습니다.", "error");
+            } finally {
+                hideLoading();
+            }
+        });
+
+        // Load Posts from Firestore (RULE 2: Client-side sorting)
+        async function loadPosts() {
+            if (!currentUser) return;
+
+            postsContainer.innerHTML = `
+                <div class="text-center py-12">
+                    <i class="fa-solid fa-spinner animate-spin text-3xl text-purple-500 mb-3"></i>
+                    <p class="text-sm text-gray-400">게시글 목록을 최신 상태로 갱신하는 중...</p>
+                </div>
+            `;
+
+            try {
+                const postsColRef = collection(db, 'artifacts', appId, 'public', 'data', 'posts');
+                const snapshot = await runWithRetry(() => getDocs(postsColRef));
+                
+                const posts = [];
+                snapshot.forEach((doc) => {
+                    posts.push({ id: doc.id, ...doc.data() });
+                });
+
+                posts.sort((a, b) => {
+                    const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+                    const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+                    return dateB - dateA;
+                });
+
+                renderPosts(posts);
+            } catch (err) {
+                console.error("Failed to fetch community posts:", err);
+                showToast("최신 게시글 수신에 실패했습니다.", "error");
+            }
+        }
+
+        btnRefreshPosts.addEventListener('click', loadPosts);
+
+        // Render Post HTML Cards
+        function renderPosts(posts) {
+            postsContainer.innerHTML = '';
+
+            if (posts.length === 0) {
+                postsContainer.innerHTML = `
+                    <div class="text-center py-12 bg-gray-900/30 border border-gray-800/50 rounded-2xl">
+                        <i class="fa-solid fa-folder-open text-gray-600 text-4xl mb-3"></i>
+                        <p class="text-gray-500 text-sm">등록된 커뮤니티 게시글이 없습니다. 첫 글을 등록해 보세요!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            posts.forEach(post => {
+                const escTitle = escapeHtml(post.title);
+                const escTag = escapeHtml(post.tag || '일반');
+                const escContent = escapeHtml(post.content).replace(/\n/g, '<br>');
+                const escAuthor = escapeHtml(post.authorName);
+                const escAvatar = escapeHtml(post.authorAvatar || 'fa-ghost');
+                
+                let timeStr = "날짜 정보 없음";
+                if (post.createdAt) {
+                    const d = msg.createdAt.toDate ? msg.createdAt.toDate() : new Date(msg.createdAt);
+                    timeStr = d.toLocaleDateString() + " " + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                }
+
+                const postHtml = `
+                    <div class="bg-gray-900/40 border border-gray-800 rounded-2xl p-5 hover:border-purple-500/30 transition duration-200 shadow-md">
+                        <div class="flex items-start justify-between flex-wrap gap-2 mb-3">
+                            <div class="flex items-center gap-2">
+                                <span class="bg-purple-900/60 text-purple-300 border border-purple-500/20 text-xs px-2.5 py-1 rounded-full font-bold">
+                                    ${escTag}
+                                </span>
+                                <h4 class="font-extrabold text-white text-base md:text-lg hover:text-purple-300 transition cursor-pointer">
+                                    ${escTitle}
+                                </h4>
+                            </div>
+                            <span class="text-xs text-gray-500">${timeStr}</span>
+                        </div>
+                        
+                        <p class="text-gray-300 text-sm leading-relaxed mb-4 whitespace-pre-line break-all">
+                            ${escContent}
+                        </p>
+
+                        <div class="flex items-center justify-between border-t border-gray-800/80 pt-3">
+                            <div class="flex items-center gap-2">
+                                <div class="h-6 w-6 rounded bg-gray-800 flex items-center justify-center text-purple-400 text-xs">
+                                    <i class="fa-solid ${escAvatar}"></i>
+                                </div>
+                                <span class="text-xs font-bold text-gray-400">${escAuthor}</span>
+                                <span class="text-[9px] text-gray-500">UID: ${post.authorUid}</span>
+                            </div>
+                            
+                            <div class="flex items-center gap-3 text-xs text-gray-500">
+                                <span class="hover:text-purple-400 transition cursor-pointer flex items-center gap-1.5">
+                                    <i class="fa-regular fa-comment"></i> 공략댓글
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                postsContainer.innerHTML += postHtml;
+            });
         }
     </script>
 </body>
