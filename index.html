@@ -46,10 +46,6 @@
         <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
       </span>
       <h1 class="font-bold text-lg text-white tracking-wide">실시간 로비 채팅</h1>
-      <div class="bg-slate-900 border border-slate-700 rounded-full px-3 py-1 flex items-center gap-1.5 text-xs text-slate-300">
-        <i data-lucide="users" class="w-3.5 h-3.5 text-indigo-400"></i>
-        현재 접속: <span id="member-count" class="font-bold text-indigo-400">0</span>명
-      </div>
     </div>
     <div class="flex items-center gap-3">
       <span id="user-badge" class="text-sm bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-600 hidden font-medium"></span>
@@ -138,7 +134,6 @@
     const btnEnter = document.getElementById('btn-enter');
     const loginError = document.getElementById('login-error');
     
-    const memberCountEl = document.getElementById('member-count');
     const userBadge = document.getElementById('user-badge');
     const btnExit = document.getElementById('btn-exit');
     const cleaningBanner = document.getElementById('cleaning-banner');
@@ -150,7 +145,6 @@
 
     // Firestore 경로 규칙 준수 (Rule 1: /artifacts/{appId}/public/data/{collectionName})
     const messagesCollection = collection(db, 'artifacts', appId, 'public', 'data', 'messages');
-    const membersCollection = collection(db, 'artifacts', appId, 'public', 'data', 'members');
 
     // Lucide Icons 렌더링
     lucide.createIcons();
@@ -170,43 +164,7 @@
       }
     });
 
-    // 2. 고장 나지 않는 존재 확인(Presence) 시스템 및 실시간 인원 리스너
-    function listenMemberCount() {
-      onSnapshot(membersCollection, (snapshot) => {
-        const now = Date.now();
-        const twoMinutesAgo = now - 2 * 60 * 1000; // 2분 활성 기준
-        let activeCount = 0;
-
-        snapshot.forEach((doc) => {
-          const data = doc.data();
-          if (data.lastActive) {
-            const lastActiveTime = data.lastActive.toDate ? data.lastActive.toDate().getTime() : data.lastActive;
-            if (lastActiveTime > twoMinutesAgo) {
-              activeCount++;
-            }
-          } else {
-            // 서버 타임스탬프 기록 완료 전 단계인 경우도 인원 수에 안전하게 산입
-            activeCount++;
-          }
-        });
-
-        memberCountEl.textContent = activeCount;
-      }, (error) => {
-        console.error("멤버 목록 동기화 에러:", error);
-      });
-    }
-
-    // 30초 간격으로 서버에 활성화(Heartbeat) 갱신 진행
-    setInterval(async () => {
-      if (isEntered && currentUser) {
-        const myMemberDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'members', currentUser.uid);
-        await updateDoc(myMemberDocRef, {
-          lastActive: serverTimestamp()
-        }).catch((err) => console.debug("활성화 전송 실패 (재시도 예정):", err));
-      }
-    }, 30000);
-
-    // 3. 15분 경과한 메시지 청소 및 10초 쿨다운 배너 작동
+    // 2. 15분 경과한 메시지 청소 및 10초 쿨다운 배너 작동
     async function checkAndCleanMessages(allMessages) {
       if (allMessages.length === 0 || cleaningActive) return;
 
@@ -275,7 +233,7 @@
       }
     }
 
-    // 4. 메시지 실시간 관측 및 화면 드로잉
+    // 3. 메시지 실시간 관측 및 화면 드로잉
     function listenMessages() {
       const q = query(messagesCollection, orderBy('timestamp', 'asc'));
 
@@ -348,7 +306,7 @@
       return text.replace(/[&<>"']/g, function(m) { return map[m]; });
     }
 
-    // 5. 입장 및 퇴장 이벤트
+    // 4. 입장 및 퇴장 이벤트
     async function handleEntrance() {
       const nicknameValue = nicknameInput.value.trim();
       if (!nicknameValue) {
@@ -375,15 +333,7 @@
         toggleChatInputState(false);
       }
 
-      // 내 멤버쉽 문서 설정 (고유 ID 기반)
-      const myMemberDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'members', currentUser.uid);
-      await setDoc(myMemberDocRef, {
-        nickname: myNickname,
-        lastActive: serverTimestamp()
-      });
-
       // 리스너 작동 시작
-      listenMemberCount();
       listenMessages();
 
       // 시스템 입장 메시지 추가
@@ -402,10 +352,6 @@
       if (!isEntered || !currentUser) return;
 
       try {
-        // 내 멤버쉽 문서 안전 삭제 (이후 실시간 리스너에 의해 인원수가 자동으로 줄어듭니다)
-        const myMemberDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'members', currentUser.uid);
-        await deleteDoc(myMemberDocRef);
-
         await addDoc(messagesCollection, {
           nickname: "[시스템]",
           text: `👋 ${myNickname} 님이 퇴장하셨습니다.`,
@@ -418,7 +364,7 @@
       }
     }
 
-    // 6. 이벤트 바인딩
+    // 5. 이벤트 바인딩
     btnEnter.addEventListener('click', handleEntrance);
     nicknameInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') handleEntrance();
@@ -442,15 +388,6 @@
         });
       } catch (error) {
         console.error("메시지 전송 실패:", error);
-      }
-    });
-
-    // 브라우저 탭을 닫거나 다른 곳으로 이동할 때 내 존재 문서를 지워 다른 사람들의 화면에 카운트가 즉각 차감되도록 지원
-    window.addEventListener('beforeunload', () => {
-      if (isEntered && currentUser) {
-        const myMemberDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'members', currentUser.uid);
-        // 비동기로 동작하지만, 브라우저가 종료 전 파이어베이스에 전송을 시도합니다.
-        deleteDoc(myMemberDocRef);
       }
     });
 
