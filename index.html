@@ -1,807 +1,477 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>수유게임 실시간 채팅방</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome 아이콘 -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Noto Sans KR', sans-serif;
-            background-color: #0b0f19;
-            color: #e2e8f0;
-        }
-        .gaming-title {
-            font-family: 'Orbitron', sans-serif;
-        }
-        /* Custom scrollbar for chat */
-        .chat-scrollbar::-webkit-scrollbar {
-            width: 6px;
-        }
-        .chat-scrollbar::-webkit-scrollbar-track {
-            background: #111827;
-        }
-        .chat-scrollbar::-webkit-scrollbar-thumb {
-            background: #4b5563;
-            border-radius: 3px;
-        }
-        .chat-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: #6b7280;
-        }
-        /* Neon glowing effects */
-        .neon-border {
-            box-shadow: 0 0 15px rgba(139, 92, 246, 0.3);
-        }
-        .neon-text {
-            text-shadow: 0 0 8px rgba(139, 92, 246, 0.6);
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>실시간 파이어베이스 채팅 시스템</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons (디자인용 아이콘 스크립트) -->
+  <script src="https://unpkg.com/lucide@latest"></script>
 </head>
-<body class="min-h-screen flex flex-col overflow-hidden">
+<body class="bg-slate-900 text-slate-100 font-sans h-screen flex flex-col justify-between overflow-hidden">
 
-    <!-- Loading Overlay -->
-    <div id="loading-screen" class="fixed inset-0 bg-[#070a13] z-50 flex flex-col items-center justify-center transition-opacity duration-500">
-        <div class="relative w-24 h-24">
-            <div class="absolute inset-0 rounded-full border-4 border-t-purple-600 border-r-pink-500 border-b-blue-500 border-l-transparent animate-spin"></div>
-            <div class="absolute inset-2 bg-[#0b0f19] rounded-full flex items-center justify-center">
-                <i class="fa-solid fa-comments text-3xl text-purple-500 animate-pulse"></i>
-            </div>
+  <!-- 1. 닉네임 입력 모달 (입장 전 화면) -->
+  <div id="login-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 transition-all duration-300">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-md shadow-2xl transform transition-all">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="bg-indigo-600 p-3 rounded-xl">
+          <i data-lucide="message-square" class="w-6 h-6 text-white"></i>
         </div>
-        <h2 class="gaming-title text-xl font-bold mt-6 text-purple-400 tracking-widest neon-text">SUYU CHAT</h2>
-        <p class="text-gray-400 text-sm mt-2">서버 연결 중...</p>
-    </div>
-
-    <!-- Custom Modal Dialog (대체 얼럿/컨펌용) -->
-    <div id="custom-modal" class="hidden fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-        <div class="w-full max-w-sm bg-gray-950 border border-gray-800 rounded-2xl p-6 shadow-2xl relative text-center">
-            <h3 id="modal-title" class="gaming-title text-purple-400 font-bold text-lg mb-2">알림</h3>
-            <p id="modal-desc" class="text-gray-300 text-sm mb-6"></p>
-            <div class="flex justify-center gap-3">
-                <button id="modal-btn-cancel" class="hidden px-5 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-sm font-semibold transition">취소</button>
-                <button id="modal-btn-confirm" class="px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl text-sm font-semibold transition">확인</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Toast Notification -->
-    <div id="toast" class="fixed top-5 right-5 z-50 transform translate-y-[-100px] opacity-0 transition-all duration-300 bg-gray-800 border-l-4 border-purple-500 text-white px-6 py-4 rounded-lg shadow-2xl flex items-center gap-3">
-        <span id="toast-icon" class="text-purple-400 text-xl"><i class="fa-solid fa-bell"></i></span>
         <div>
-            <p id="toast-msg" class="font-medium text-sm"></p>
+          <h2 class="text-xl font-bold text-white">실시간 채팅방 입장</h2>
+          <p class="text-xs text-slate-400">활동할 닉네임을 설정해 주세요.</p>
         </div>
+      </div>
+      <div class="space-y-4">
+        <div>
+          <label for="nickname-input" class="block text-sm font-medium text-slate-300 mb-2">닉네임</label>
+          <input type="text" id="nickname-input" max="15" placeholder="닉네임을 입력하세요 (최대 15자)" 
+                 class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all">
+        </div>
+        <button id="btn-enter" class="w-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold py-3 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2">
+          채팅방 입장하기
+          <i data-lucide="arrow-right" class="w-5 h-5"></i>
+        </button>
+        <p id="login-error" class="text-red-400 text-xs text-center hidden">닉네임을 입력해 주세요!</p>
+      </div>
     </div>
+  </div>
 
-    <!-- MAIN APP STRUCTURE -->
-    <div class="flex-grow flex flex-col h-screen">
+  <!-- 2. 메인 채팅 인터페이스 -->
+  <header class="bg-slate-800 border-b border-slate-700 px-6 py-4 flex items-center justify-between shadow-md">
+    <div class="flex items-center gap-3">
+      <span class="relative flex h-3 w-3">
+        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+        <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+      </span>
+      <h1 class="font-bold text-lg text-white tracking-wide">실시간 로비 채팅</h1>
+      <div class="bg-slate-900 border border-slate-700 rounded-full px-3 py-1 flex items-center gap-1.5 text-xs text-slate-300">
+        <i data-lucide="users" class="w-3.5 h-3.5 text-indigo-400"></i>
+        현재 접속: <span id="member-count" class="font-bold text-indigo-400">0</span>명
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <span id="user-badge" class="text-sm bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-600 hidden font-medium"></span>
+      <button id="btn-exit" class="text-slate-400 hover:text-rose-400 transition-all text-sm flex items-center gap-1">
+        <i data-lucide="log-out" class="w-4 h-4"></i>
+        퇴장
+      </button>
+    </div>
+  </header>
 
-        <!-- 1. AUTH SCREEN (간편 프로필 설정 입장 화면) -->
-        <div id="auth-screen" class="hidden flex-grow flex items-center justify-center p-4 h-full">
-            <div class="w-full max-w-md bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl p-8 neon-border relative overflow-hidden">
-                <div class="absolute -top-10 -right-10 w-40 h-40 bg-purple-600 rounded-full filter blur-3xl opacity-20"></div>
-                <div class="absolute -bottom-10 -left-10 w-40 h-40 bg-blue-600 rounded-full filter blur-3xl opacity-20"></div>
-                
-                <div class="text-center relative z-10">
-                    <div class="inline-flex p-3 bg-purple-900/40 rounded-2xl border border-purple-500/30 mb-4">
-                        <i class="fa-solid fa-comments text-4xl text-purple-400 animate-bounce"></i>
-                    </div>
-                    <h1 class="gaming-title text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 tracking-wider">SUYU CHAT</h1>
-                    <p class="text-gray-400 text-sm mt-2">수유 게이머들을 위한 실시간 전용 소통 채널</p>
-                </div>
+  <!-- 메시지 정리 안내 알림 (10초간 노출 예정) -->
+  <div id="cleaning-banner" class="hidden bg-amber-500/10 border-b border-amber-500/20 px-6 py-3 flex items-center justify-center gap-2.5 text-amber-300 text-sm font-semibold transition-all duration-300">
+    <i data-lucide="alert-triangle" class="w-5 h-5 animate-bounce"></i>
+    <span>메시지가 정리되었습니다. (10초 동안 새로운 메시지를 전송할 수 없습니다.)</span>
+  </div>
 
-                <div class="mt-8 space-y-6 relative z-10">
-                    <!-- 아바타 로고 선택기 -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-400 mb-2">프로필 아이콘 선택</label>
-                        <div id="avatar-grid" class="grid grid-cols-5 gap-3">
-                            <button class="avatar-opt h-12 w-12 rounded-xl bg-purple-900/50 hover:bg-purple-700/50 flex items-center justify-center text-xl text-purple-300 border border-purple-500/30 transition duration-150" data-icon="fa-ghost">
-                                <i class="fa-solid fa-ghost"></i>
-                            </button>
-                            <button class="avatar-opt h-12 w-12 rounded-xl bg-gray-800 hover:bg-purple-700/50 flex items-center justify-center text-xl text-blue-300 border border-transparent transition duration-150" data-icon="fa-dragon">
-                                <i class="fa-solid fa-dragon"></i>
-                            </button>
-                            <button class="avatar-opt h-12 w-12 rounded-xl bg-gray-800 hover:bg-purple-700/50 flex items-center justify-center text-xl text-pink-300 border border-transparent transition duration-150" data-icon="fa-mask">
-                                <i class="fa-solid fa-mask"></i>
-                            </button>
-                            <button class="avatar-opt h-12 w-12 rounded-xl bg-gray-800 hover:bg-purple-700/50 flex items-center justify-center text-xl text-green-300 border border-transparent transition duration-150" data-icon="fa-robot">
-                                <i class="fa-solid fa-robot"></i>
-                            </button>
-                            <button class="avatar-opt h-12 w-12 rounded-xl bg-gray-800 hover:bg-purple-700/50 flex items-center justify-center text-xl text-yellow-300 border border-transparent transition duration-150" data-icon="fa-hat-wizard">
-                                <i class="fa-solid fa-hat-wizard"></i>
-                            </button>
-                            <button class="avatar-opt h-12 w-12 rounded-xl bg-gray-800 hover:bg-purple-700/50 flex items-center justify-center text-xl text-indigo-300 border border-transparent transition duration-150" data-icon="fa-gamepad">
-                                <i class="fa-solid fa-gamepad"></i>
-                            </button>
-                            <button class="avatar-opt h-12 w-12 rounded-xl bg-gray-800 hover:bg-purple-700/50 flex items-center justify-center text-xl text-red-300 border border-transparent transition duration-150" data-icon="fa-skull">
-                                <i class="fa-solid fa-skull"></i>
-                            </button>
-                            <button class="avatar-opt h-12 w-12 rounded-xl bg-gray-800 hover:bg-purple-700/50 flex items-center justify-center text-xl text-teal-300 border border-transparent transition duration-150" data-icon="fa-bolt">
-                                <i class="fa-solid fa-bolt"></i>
-                            </button>
-                            <button class="avatar-opt h-12 w-12 rounded-xl bg-gray-800 hover:bg-purple-700/50 flex items-center justify-center text-xl text-orange-300 border border-transparent transition duration-150" data-icon="fa-crown">
-                                <i class="fa-solid fa-crown"></i>
-                            </button>
-                            <button class="avatar-opt h-12 w-12 rounded-xl bg-gray-800 hover:bg-purple-700/50 flex items-center justify-center text-xl text-rose-300 border border-transparent transition duration-150" data-icon="fa-cat">
-                                <i class="fa-solid fa-cat"></i>
-                            </button>
-                        </div>
-                    </div>
+  <!-- 채팅 메시지 영역 -->
+  <main id="chat-box" class="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-950">
+    <div class="flex items-center justify-center h-full text-slate-500 text-sm flex-col gap-2">
+      <i data-lucide="message-square-dashed" class="w-12 h-12 stroke-[1.5] text-slate-600"></i>
+      <span>닉네임을 입력하고 입장하시면 실시간 대화가 시작됩니다.</span>
+    </div>
+  </main>
 
-                    <!-- 닉네임 입력 -->
-                    <div>
-                        <label for="input-nickname" class="block text-sm font-medium text-gray-400 mb-2">닉네임 설정</label>
-                        <input type="text" id="input-nickname" maxlength="15" placeholder="사용할 닉네임을 입력해 주세요" class="w-full bg-gray-800/80 border border-gray-700 focus:border-purple-500 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition duration-200">
-                    </div>
+  <!-- 채팅 입력창 영역 -->
+  <footer class="bg-slate-800 border-t border-slate-700 p-4 shadow-2xl">
+    <form id="chat-form" class="max-w-4xl mx-auto flex gap-2">
+      <input type="text" id="chat-input" disabled placeholder="채팅방에 먼저 입장해 주세요..."
+             class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+      <button type="submit" id="btn-send" disabled
+              class="bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 disabled:bg-slate-700 text-white px-6 rounded-xl font-semibold transition-all shadow-md flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed">
+        <span>전송</span>
+        <i data-lucide="send" class="w-4 h-4"></i>
+      </button>
+    </form>
+  </footer>
 
-                    <button id="btn-submit-profile" class="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold py-3.5 px-6 rounded-xl transition duration-200 shadow-lg flex items-center justify-center gap-2">
-                        <i class="fa-solid fa-door-open"></i> 채팅방 입장하기
-                    </button>
-                </div>
+  <!-- Firebase JavaScript SDK v11.x+ 구문 적용 -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { 
+      getFirestore, 
+      doc, 
+      setDoc, 
+      getDoc, 
+      updateDoc, 
+      collection, 
+      addDoc, 
+      query, 
+      orderBy, 
+      onSnapshot, 
+      getDocs, 
+      deleteDoc, 
+      writeBatch, 
+      serverTimestamp, 
+      increment,
+      runTransaction
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+    // 제공해주신 파이어베이스 설정값 활용
+    const firebaseConfig = {
+      apiKey: "AIzaSyBiHlY3xM5y5K7V2_AlQH3YENGNMhK3RNk",
+      authDomain: "suyu-74792.firebaseapp.com",
+      projectId: "suyu-74792",
+      storageBucket: "suyu-74792.firebasestorage.app",
+      messagingSenderId: "308516702406",
+      appId: "1:308516702406:web:f331aa5fb6e86c97092fc7",
+      measurementId: "G-YCVCPD4WFF"
+    };
+
+    // Firebase 초기화
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    // 글로벌 상태 변수
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'suyu-chat-room';
+    let currentUser = null;
+    let myNickname = '';
+    let isEntered = false;
+    let cleaningTimeout = null;
+    let cleaningActive = false; // 10초 대기 중인지 여부
+
+    // DOM 요소 캐싱
+    const loginModal = document.getElementById('login-modal');
+    const nicknameInput = document.getElementById('nickname-input');
+    const btnEnter = document.getElementById('btn-enter');
+    const loginError = document.getElementById('login-error');
+    
+    const memberCountEl = document.getElementById('member-count');
+    const userBadge = document.getElementById('user-badge');
+    const btnExit = document.getElementById('btn-exit');
+    const cleaningBanner = document.getElementById('cleaning-banner');
+    
+    const chatBox = document.getElementById('chat-box');
+    const chatForm = document.getElementById('chat-form');
+    const chatInput = document.getElementById('chat-input');
+    const btnSend = document.getElementById('btn-send');
+
+    // Firestore 경로 규칙 준수 (Rule 1: /artifacts/{appId}/public/data/{collectionName})
+    const messagesCollection = collection(db, 'artifacts', appId, 'public', 'data', 'messages');
+    const counterDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'counters', 'memberCounter');
+
+    // Lucide Icons 렌더링
+    lucide.createIcons();
+
+    // 1. Firebase 익명 인증 및 초기 셋업
+    async function initApp() {
+      try {
+        await signInAnonymously(auth);
+      } catch (error) {
+        console.error("인증 실패:", error);
+      }
+    }
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        currentUser = user;
+        // 초기화 시 카운터 문서가 없으면 강제 초기값 0으로 생성
+        initializeCounter();
+      }
+    });
+
+    // 접속 멤버 카운터 초기값 세팅 함수
+    async function initializeCounter() {
+      try {
+        const docSnap = await getDoc(counterDocRef);
+        if (!docSnap.exists()) {
+          await setDoc(counterDocRef, { count: 0 }, { merge: true });
+        }
+      } catch (err) {
+        console.error("카운터 초기화 오류:", err);
+      }
+    }
+
+    // 2. 실시간 멤버수 관리 기능 (입장 시 가산, 퇴장 시 감산)
+    async function adjustMemberCount(value) {
+      if (!currentUser) return;
+      try {
+        await runTransaction(db, async (transaction) => {
+          const sfDoc = await transaction.get(counterDocRef);
+          if (!sfDoc.exists()) {
+            transaction.set(counterDocRef, { count: Math.max(0, value) });
+          } else {
+            const newCount = (sfDoc.data().count || 0) + value;
+            transaction.update(counterDocRef, { count: Math.max(0, newCount) });
+          }
+        });
+      } catch (error) {
+        console.error("멤버 수 업데이트 에러:", error);
+      }
+    }
+
+    // 실시간 멤버 수 관측
+    function listenMemberCount() {
+      onSnapshot(counterDocRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          memberCountEl.textContent = data.count || 0;
+        }
+      }, (error) => {
+        console.error("멤버 수 동기화 에러:", error);
+      });
+    }
+
+    // 3. 15분 경과한 메시지 삭제 및 10초 쿨다운 배너 작동 로직
+    // Firestore Compound Query 및 Complex Logic 제한 우회 (JS 메모리에서 판단)
+    async function checkAndCleanMessages(allMessages) {
+      if (allMessages.length === 0 || cleaningActive) return;
+
+      // 가장 처음(가장 오래된) 메시지의 타임스탬프 기준 검사
+      const oldestMsg = allMessages[0];
+      if (!oldestMsg.timestamp) return; // 서버 타임스탬프 생성 전 빈 값 스킵
+
+      const oldestTime = oldestMsg.timestamp.toDate ? oldestMsg.timestamp.toDate().getTime() : oldestMsg.timestamp;
+      const currentTime = Date.now();
+      const fifteenMinutesMs = 15 * 60 * 1000; // 15분
+
+      if (currentTime - oldestTime >= fifteenMinutesMs) {
+        // 15분 지남 -> 청소 프로세스 트리거
+        await triggerCleaningProcess();
+      }
+    }
+
+    // 일괄 청소 함수
+    async function triggerCleaningProcess() {
+      cleaningActive = true;
+      toggleChatInputState(true); // 입력 일시정지
+
+      try {
+        // 모든 메시지 가져와서 Batch Delete 처리 (Rule 2 준수: 심플 쿼리 후 메모리 핸들링)
+        const snapshot = await getDocs(messagesCollection);
+        const batch = writeBatch(db);
+        snapshot.docs.forEach((doc) => {
+          batch.delete(doc.ref);
+        });
+        await batch.commit();
+
+        // UI에 청소 안내 배너 활성화 (10초 타이머 작동)
+        showCleaningBanner();
+
+      } catch (err) {
+        console.error("데이터 정리 중 에러:", err);
+        cleaningActive = false;
+        toggleChatInputState(false);
+      }
+    }
+
+    // 청소 완료 안내 배너 노출 (10초간)
+    function showCleaningBanner() {
+      // 만약 이미 실행 중인 청소 타이머가 있다면 삭제
+      if (cleaningTimeout) {
+        clearTimeout(cleaningTimeout);
+      }
+
+      cleaningBanner.classList.remove('hidden');
+      toggleChatInputState(true);
+
+      // 10초 뒤 정리 배너 숨김 및 채팅창 복구
+      cleaningTimeout = setTimeout(() => {
+        cleaningBanner.classList.add('hidden');
+        cleaningActive = false;
+        if (isEntered) {
+          toggleChatInputState(false);
+        }
+      }, 10000);
+    }
+
+    // 입력창 상태 업데이트
+    function toggleChatInputState(isDisabled) {
+      if (isDisabled) {
+        chatInput.disabled = true;
+        btnSend.disabled = true;
+        chatInput.placeholder = "현재 메시지가 정리 중입니다. 잠시만 기다려 주세요...";
+      } else {
+        chatInput.disabled = false;
+        btnSend.disabled = false;
+        chatInput.placeholder = "메시지를 입력하세요...";
+        chatInput.focus();
+      }
+    }
+
+    // 4. 실시간 메시지 관측 및 렌더링
+    function listenMessages() {
+      // 복잡한 Compound Query 회피: 가벼운 정렬 쿼리만 적용 (Rule 2 준수)
+      const q = query(messagesCollection, orderBy('timestamp', 'asc'));
+
+      onSnapshot(q, (snapshot) => {
+        const messages = [];
+        chatBox.innerHTML = '';
+
+        if (snapshot.empty) {
+          chatBox.innerHTML = `
+            <div class="flex items-center justify-center h-full text-slate-500 text-sm flex-col gap-2">
+              <i data-lucide="message-square" class="w-12 h-12 stroke-[1.5] text-slate-600"></i>
+              <span>정리되었거나 생성된 메시지가 없습니다. 대화를 시작해 보세요!</span>
             </div>
-        </div>
-
-        <!-- 2. MAIN APP CONTENT (로그인 후 화면) -->
-        <div id="main-screen" class="hidden flex-grow flex flex-col h-full">
-            <!-- Navigation Bar -->
-            <nav class="bg-[#0e1626]/90 border-b border-gray-800 sticky top-0 z-40 backdrop-blur-md">
-                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div class="flex items-center justify-between h-16">
-                        <div class="flex items-center gap-3">
-                            <div class="p-2 bg-gradient-to-tr from-purple-600 to-pink-500 rounded-lg">
-                                <i class="fa-solid fa-comments text-white text-lg"></i>
-                            </div>
-                            <span class="gaming-title text-xl font-black text-white tracking-widest neon-text">SUYU CHAT</span>
-                        </div>
-
-                        <!-- User Profile Status & Logout -->
-                        <div class="flex items-center gap-4">
-                            <div class="flex items-center gap-3 bg-gray-800/40 border border-gray-800 py-1.5 px-3 rounded-xl">
-                                <div id="nav-user-avatar" class="h-8 w-8 rounded-lg bg-purple-900/60 flex items-center justify-center text-purple-300 text-sm">
-                                    <i class="fa-solid fa-ghost"></i>
-                                </div>
-                                <div class="text-left">
-                                    <p id="nav-user-name" class="text-xs font-bold text-gray-200">Gamer</p>
-                                    <p class="text-[10px] text-gray-500">수유 게이머</p>
-                                </div>
-                            </div>
-                            <button id="btn-logout" class="text-gray-400 hover:text-red-400 text-sm p-2 rounded-lg hover:bg-red-500/10 transition" title="나가기">
-                                <i class="fa-solid fa-right-from-bracket"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </nav>
-
-            <!-- Content Area (Chat Window) -->
-            <main class="flex-grow max-w-7xl w-full mx-auto p-4 md:p-6 flex flex-col md:flex-row gap-6 h-[calc(100vh-4rem)] overflow-hidden">
-                
-                <!-- Left: Realtime Chat Area -->
-                <div class="flex-grow flex flex-col bg-[#111827]/80 border border-gray-800 rounded-2xl overflow-hidden shadow-xl h-full">
-                    <!-- Chat Header -->
-                    <div class="bg-gray-900/50 p-4 border-b border-gray-800/80 flex items-center justify-between">
-                        <div class="flex items-center gap-3">
-                            <span class="relative flex h-2 w-2">
-                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                            </span>
-                            <div>
-                                <h3 class="font-bold text-gray-100 text-sm sm:text-base">수유 실시간 광장</h3>
-                                <p class="text-[11px] text-purple-400">서버 데이터 정리를 위해 15분이 지난 채팅 메시지는 자동 삭제됩니다.</p>
-                            </div>
-                        </div>
-                        <span id="active-user-counter" class="text-xs bg-gray-800 text-gray-400 px-2.5 py-1 rounded-full font-medium">연결 중...</span>
-                    </div>
-
-                    <!-- Chat Messages Container -->
-                    <div id="chat-messages" class="flex-grow p-4 overflow-y-auto space-y-4 chat-scrollbar h-0">
-                        <div class="flex items-center justify-center h-full text-gray-500 text-sm">
-                            <div class="text-center">
-                                <i class="fa-solid fa-spinner animate-spin text-2xl text-purple-500 mb-3"></i>
-                                <p>메시지를 동기화하고 있습니다...</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Chat Input Box -->
-                    <form id="chat-form" class="p-3 bg-gray-900/80 border-t border-gray-800/80 flex items-center gap-2">
-                        <input type="text" id="chat-input" maxlength="250" placeholder="메시지를 입력하세요 (비속어 자제)" class="flex-grow bg-gray-800/70 border border-gray-700 focus:border-purple-500 focus:outline-none rounded-xl px-4 py-3 text-sm text-white focus:ring-1 focus:ring-purple-500/20">
-                        <button type="submit" class="bg-purple-600 hover:bg-purple-500 text-white font-bold h-11 px-5 rounded-xl transition duration-150 flex items-center justify-center">
-                            <i class="fa-solid fa-paper-plane"></i>
-                        </button>
-                    </form>
-                </div>
-
-                <!-- Right: Online Gamers Panel -->
-                <div class="w-full md:w-64 bg-gray-900/60 border border-gray-800 rounded-2xl p-4 flex flex-col h-40 md:h-full overflow-hidden shrink-0">
-                    <div class="flex items-center justify-between border-b border-gray-800 pb-2 mb-3">
-                        <h4 class="font-bold text-gray-300 text-xs flex items-center gap-2">
-                            <i class="fa-solid fa-users text-purple-400"></i> 총입장 합계
-                        </h4>
-                        <span class="text-xs bg-purple-900/50 text-purple-300 px-2 py-0.5 rounded-full" id="online-count">0</span>
-                    </div>
-                    <div id="users-list" class="flex-grow overflow-y-auto chat-scrollbar space-y-2 flex flex-row md:flex-col gap-2 md:gap-0 h-0">
-                        <p class="text-xs text-gray-500 text-center py-4 w-full">접속자가 없습니다.</p>
-                    </div>
-                </div>
-
-            </main>
-        </div>
-
-    </div>
-
-    <!-- Firebase SDK Imports -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { 
-            getAuth, 
-            signInAnonymously, 
-            signOut, 
-            onAuthStateChanged 
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { 
-            getFirestore, 
-            doc, 
-            setDoc, 
-            getDoc, 
-            deleteDoc,
-            collection, 
-            addDoc, 
-            query, 
-            onSnapshot, 
-            orderBy, 
-            limit, 
-            serverTimestamp 
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Global Variables
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'suyu-game-community-v1';
-        
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-            apiKey: "AIzaSyBiHlY3xM5y5K7V2_AlQH3YENGNMhK3RNk",
-            authDomain: "suyu-74792.firebaseapp.com",
-            projectId: "suyu-74792",
-            storageBucket: "suyu-74792.firebasestorage.app",
-            messagingSenderId: "308516702406",
-            appId: "1:308516702406:web:f331aa5fb6e86c97092fc7",
-            measurementId: "G-YCVCPD4WFF"
-        };
-
-        // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-
-        // Application State
-        let currentUser = null;
-        let userData = {
-            nickname: '',
-            avatar: 'fa-ghost'
-        };
-        let selectedAvatar = 'fa-ghost';
-
-        // Realtime Listeners
-        let unsubChat = null;
-        let unsubUsers = null;
-
-        // UI Elements
-        const loadingScreen = document.getElementById('loading-screen');
-        const authScreen = document.getElementById('auth-screen');
-        const mainScreen = document.getElementById('main-screen');
-        const avatarGrid = document.getElementById('avatar-grid');
-        const inputNickname = document.getElementById('input-nickname');
-        const btnSubmitProfile = document.getElementById('btn-submit-profile');
-        const btnLogout = document.getElementById('btn-logout');
-
-        // Chat UI Elements
-        const chatForm = document.getElementById('chat-form');
-        const chatInput = document.getElementById('chat-input');
-        const chatMessages = document.getElementById('chat-messages');
-        const usersList = document.getElementById('users-list');
-        const onlineCount = document.getElementById('online-count');
-        const activeUserCounter = document.getElementById('active-user-counter');
-
-        // Custom Modal Controller
-        function showCustomModal(title, description, onConfirm = null, onCancel = null) {
-            const modal = document.getElementById('custom-modal');
-            const mTitle = document.getElementById('modal-title');
-            const mDesc = document.getElementById('modal-desc');
-            const btnConfirm = document.getElementById('modal-btn-confirm');
-            const btnCancel = document.getElementById('modal-btn-cancel');
-
-            mTitle.innerText = title;
-            mDesc.innerText = description;
-            
-            modal.classList.remove('hidden');
-
-            btnConfirm.onclick = () => {
-                modal.classList.add('hidden');
-                if (onConfirm) onConfirm();
-            };
-
-            if (onCancel) {
-                btnCancel.classList.remove('hidden');
-                btnCancel.onclick = () => {
-                    modal.classList.add('hidden');
-                    onCancel();
-                };
-            } else {
-                btnCancel.classList.add('hidden');
-            }
+          `;
+          lucide.createIcons();
+          return;
         }
 
-        // Toast Notification
-        function showToast(message, type = 'info') {
-            const toast = document.getElementById('toast');
-            const toastMsg = document.getElementById('toast-msg');
-            const toastIcon = document.getElementById('toast-icon');
-
-            toastMsg.innerText = message;
-            
-            if (type === 'error') {
-                toast.className = "fixed top-5 right-5 z-50 transform translate-y-0 opacity-100 transition-all duration-300 bg-gray-900 border-l-4 border-red-500 text-white px-6 py-4 rounded-lg shadow-2xl flex items-center gap-3";
-                toastIcon.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-red-500"></i>`;
-            } else if (type === 'success') {
-                toast.className = "fixed top-5 right-5 z-50 transform translate-y-0 opacity-100 transition-all duration-300 bg-gray-900 border-l-4 border-green-500 text-white px-6 py-4 rounded-lg shadow-2xl flex items-center gap-3";
-                toastIcon.innerHTML = `<i class="fa-solid fa-circle-check text-green-500"></i>`;
-            } else {
-                toast.className = "fixed top-5 right-5 z-50 transform translate-y-0 opacity-100 transition-all duration-300 bg-gray-900 border-l-4 border-purple-500 text-white px-6 py-4 rounded-lg shadow-2xl flex items-center gap-3";
-                toastIcon.innerHTML = `<i class="fa-solid fa-bell text-purple-400"></i>`;
-            }
-
-            toast.style.transform = "translateY(0)";
-            toast.style.opacity = "1";
-
-            setTimeout(() => {
-                toast.style.transform = "translateY(-100px)";
-                toast.style.opacity = "0";
-            }, 3000);
-        }
-
-        // Exponential Backoff API Wrapper
-        async function runWithRetry(fn, maxRetries = 5) {
-            let delay = 1000;
-            for (let i = 0; i < maxRetries; i++) {
-                try {
-                    return await fn();
-                } catch (error) {
-                    if (i === maxRetries - 1) throw error;
-                    await new Promise(res => setTimeout(res, delay));
-                    delay *= 2;
-                }
-            }
-        }
-
-        // Hide/Show Loading Animation
-        function hideLoading() {
-            loadingScreen.classList.add('opacity-0');
-            setTimeout(() => {
-                loadingScreen.classList.add('hidden');
-            }, 500);
-        }
-
-        function showLoading() {
-            loadingScreen.classList.remove('hidden');
-            loadingScreen.classList.remove('opacity-0');
-        }
-
-        // Initialize App & Authenticate (RULE 3 - Pre-flight)
-        const initAuth = async () => {
-            try {
-                // Suyu Game Community Guest Login Bypass (익명 계정 할당)
-                await signInAnonymously(auth);
-            } catch (e) {
-                console.error("Auth initialization failed:", e);
-                showToast("인증 서버 연결에 실패했습니다. 새로고침을 해주세요.", "error");
-            } finally {
-                hideLoading();
-            }
-        };
-
-        // Listen for Auth State changes
-        onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                currentUser = user;
-                await checkUserProfile(user.uid);
-            } else {
-                currentUser = null;
-                showAuthScreen();
-            }
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          data.id = doc.id;
+          messages.push(data);
         });
 
-        // Check if Private User document exists (RULE 1)
-        async function checkUserProfile(uid) {
-            try {
-                const userDocRef = doc(db, 'artifacts', appId, 'users', uid, 'profile', 'info');
-                const userDoc = await runWithRetry(() => getDoc(userDocRef));
+        // 15분 경과 자동 청소 검증 실행
+        checkAndCleanMessages(messages);
 
-                if (userDoc.exists()) {
-                    userData = userDoc.data();
-                    showMainScreen();
-                } else {
-                    showAuthScreen(); // Profile Setup Lobby
-                    inputNickname.value = "게이머_" + Math.floor(1000 + Math.random() * 9000);
-                }
-            } catch (error) {
-                console.error("Error retrieving user profile:", error);
-                showAuthScreen();
-            } finally {
-                hideLoading();
-            }
-        }
+        // 메시지 렌더링
+        messages.forEach((msg) => {
+          const isMe = msg.nickname === myNickname;
+          const messageWrapper = document.createElement('div');
+          messageWrapper.className = `flex flex-col ${isMe ? 'items-end' : 'items-start'} space-y-1 mb-2 animate-fadeIn`;
 
-        // Avatar Selection
-        const avatarOpts = document.querySelectorAll('.avatar-opt');
-        avatarOpts.forEach(btn => {
-            btn.addEventListener('click', () => {
-                avatarOpts.forEach(b => {
-                    b.classList.remove('bg-purple-900/50', 'border-purple-500/30');
-                    b.classList.add('bg-gray-800', 'border-transparent');
-                });
-                btn.classList.remove('bg-gray-800', 'border-transparent');
-                btn.classList.add('bg-purple-900/50', 'border-purple-500/30');
-                selectedAvatar = btn.getAttribute('data-icon');
-            });
+          const timeString = msg.timestamp && msg.timestamp.toDate 
+            ? msg.timestamp.toDate().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) 
+            : '전송 중...';
+
+          messageWrapper.innerHTML = `
+            <div class="flex items-center gap-1.5 text-xs text-slate-400 px-1">
+              <span class="font-semibold text-slate-300">${msg.nickname}</span>
+              <span class="text-[10px]">•</span>
+              <span>${timeString}</span>
+            </div>
+            <div class="max-w-[80%] rounded-2xl px-4 py-2.5 text-sm shadow-md break-all
+              ${isMe 
+                ? 'bg-indigo-600 text-white rounded-tr-none' 
+                : 'bg-slate-800 text-slate-100 rounded-tl-none border border-slate-700'
+              }">
+              ${escapeHtml(msg.text)}
+            </div>
+          `;
+          chatBox.appendChild(messageWrapper);
         });
 
-        // Submit Profile Customizations
-        btnSubmitProfile.addEventListener('click', async () => {
-            const nickname = inputNickname.value.trim();
-            if (!nickname) {
-                showToast("닉네임을 반드시 입력해야 합니다.", "error");
-                return;
-            }
+        // 자동 스크롤 하단 이동
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }, (error) => {
+        console.error("메시지 동기화 중 오류가 발생했습니다:", error);
+      });
+    }
 
-            showLoading();
-            try {
-                userData = {
-                    nickname: nickname,
-                    avatar: selectedAvatar,
-                    updatedAt: new Date().toISOString()
-                };
+    // HTML 엔티티 이스케이프 (보안강화)
+    function escapeHtml(text) {
+      const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+      };
+      return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+    }
 
-                // Rule 1: Store private user profile configuration
-                const userDocRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'profile', 'info');
-                await runWithRetry(() => setDoc(userDocRef, userData));
+    // 5. 입장 및 퇴장 이벤트 처리
+    async function handleEntrance() {
+      const nicknameValue = nicknameInput.value.trim();
+      if (!nicknameValue) {
+        loginError.textContent = "닉네임을 입력해 주세요!";
+        loginError.classList.remove('hidden');
+        return;
+      }
 
-                // Rule 1: Set user to global public users database
-                const publicUserRef = doc(db, 'artifacts', appId, 'public', 'data', 'onlineUsers', currentUser.uid);
-                await runWithRetry(() => setDoc(publicUserRef, {
-                    nickname: nickname,
-                    avatar: selectedAvatar,
-                    uid: currentUser.uid,
-                    lastActive: serverTimestamp()
-                }));
+      if (!currentUser) {
+        loginError.textContent = "연결을 준비 중입니다. 잠시 후 다시 시도해 주세요.";
+        loginError.classList.remove('hidden');
+        return;
+      }
 
-                showToast(`환영합니다, ${nickname} 플레이어님!`, "success");
-                showMainScreen();
-            } catch (err) {
-                console.error("Error setting up profile:", err);
-                showToast("프로필 등록에 실패했습니다. 다시 시도해 주세요.", "error");
-            } finally {
-                hideLoading();
-            }
+      myNickname = nicknameValue;
+      isEntered = true;
+
+      // UI 업데이트
+      userBadge.textContent = myNickname;
+      userBadge.classList.remove('hidden');
+      loginModal.classList.add('opacity-0', 'pointer-events-none');
+      
+      if (!cleaningActive) {
+        toggleChatInputState(false);
+      }
+
+      // 1) 멤버 카운트 가산
+      await adjustMemberCount(1);
+      
+      // 2) 실시간 리스너 작동 개시
+      listenMemberCount();
+      listenMessages();
+
+      // 3) 입장 안내 메시지 작성
+      try {
+        await addDoc(messagesCollection, {
+          nickname: "[시스템]",
+          text: `📢 ${myNickname} 님이 입장하셨습니다.`,
+          timestamp: serverTimestamp()
+        });
+      } catch (err) {
+        console.error("입장 알림 기록 실패:", err);
+      }
+    }
+
+    async function handleExit() {
+      if (!isEntered) return;
+
+      try {
+        // 퇴장 알림 남기기
+        await addDoc(messagesCollection, {
+          nickname: "[시스템]",
+          text: `👋 ${myNickname} 님이 퇴장하셨습니다.`,
+          timestamp: serverTimestamp()
         });
 
-        // SCREEN TOGGLES
-        function showAuthScreen() {
-            authScreen.classList.remove('hidden');
-            mainScreen.classList.add('hidden');
-            stopRealtimeListeners();
-        }
+        // 멤버 수 차감
+        await adjustMemberCount(-1);
+      } catch (err) {
+        console.error("퇴장 처리 실패:", err);
+      } finally {
+        // 페이지 새로고침하여 초기 상태로 복귀
+        window.location.reload();
+      }
+    }
 
-        function showMainScreen() {
-            authScreen.classList.add('hidden');
-            mainScreen.classList.remove('hidden');
-            
-            document.getElementById('nav-user-name').innerText = userData.nickname || 'Gamer';
-            document.getElementById('nav-user-avatar').innerHTML = `<i class="fa-solid ${userData.avatar || 'fa-ghost'}"></i>`;
+    // 6. 이벤트 바인딩
+    btnEnter.addEventListener('click', handleEntrance);
+    nicknameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') handleEntrance();
+    });
 
-            startRealtimeListeners();
-        }
+    btnExit.addEventListener('click', handleExit);
 
-        // Sign Out (Lobby return)
-        btnLogout.addEventListener('click', () => {
-            showCustomModal("방 나가기", "채팅방에서 나가고 프로필을 재설정하시겠습니까?", async () => {
-                showLoading();
-                try {
-                    if (currentUser) {
-                        try {
-                            const publicUserRef = doc(db, 'artifacts', appId, 'public', 'data', 'onlineUsers', currentUser.uid);
-                            await setDoc(publicUserRef, { status: 'offline', lastActive: serverTimestamp() }, { merge: true });
-                        } catch(e) {}
-                    }
-                    await signOut(auth);
-                    showToast("성공적으로 퇴장하였습니다.", "success");
-                } catch(e) {
-                    showToast("오류가 발생했습니다.", "error");
-                } finally {
-                    hideLoading();
-                }
-            }, () => {});
+    // 채팅 입력 전송 이벤트
+    chatForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const text = chatInput.value.trim();
+      if (!text || cleaningActive) return;
+
+      chatInput.value = '';
+
+      try {
+        await addDoc(messagesCollection, {
+          nickname: myNickname,
+          text: text,
+          timestamp: serverTimestamp()
         });
+      } catch (error) {
+        console.error("메시지 전송 오류:", error);
+      }
+    });
 
-        // Stop all Firebase Realtime listeners
-        function stopRealtimeListeners() {
-            if (unsubChat) { unsubChat(); unsubChat = null; }
-            if (unsubUsers) { unsubUsers(); unsubUsers = null; }
-        }
+    // 브라우저 이탈(창 닫기, 탭 전환 등) 시 비동기적인 실시간 멤버 감소 처리
+    window.addEventListener('beforeunload', () => {
+      if (isEntered) {
+        // 동기 수동 수단으로 카운트 업데이트 시도
+        adjustMemberCount(-1);
+      }
+    });
 
-        // Start Firebase Realtime Listeners (RULE 3)
-        function startRealtimeListeners() {
-            if (!currentUser) return;
-
-            stopRealtimeListeners();
-
-            // 1. 실시간 채팅 메시지 리스너 (RULE 2: Simple query with limit)
-            const chatColRef = collection(db, 'artifacts', appId, 'public', 'data', 'chats');
-            const chatQuery = query(chatColRef, orderBy('createdAt', 'desc'), limit(50));
-
-            unsubChat = onSnapshot(chatQuery, (snapshot) => {
-                const messages = [];
-                snapshot.forEach((doc) => {
-                    messages.push({ id: doc.id, ...doc.data() });
-                });
-                
-                messages.reverse();
-                renderChatMessages(messages);
-                
-                // 메시지 청소 스케줄링 실행
-                cleanupOldMessages(messages);
-            }, (error) => {
-                console.error("Chat snapshot error:", error);
-            });
-
-            // 2. 실시간 접속자 리스너
-            const onlineColRef = collection(db, 'artifacts', appId, 'public', 'data', 'onlineUsers');
-            const onlineQuery = query(onlineColRef, limit(100));
-
-            unsubUsers = onSnapshot(onlineQuery, (snapshot) => {
-                const users = [];
-                snapshot.forEach((doc) => {
-                    const data = doc.data();
-                    if (data && data.nickname && data.status !== 'offline') {
-                        users.push(data);
-                    }
-                });
-                renderOnlineUsers(users);
-            }, (error) => {
-                console.error("Online users snapshot error:", error);
-            });
-
-            updatePresenceHeartbeat();
-        }
-
-        // 15분 만료 및 자동 시스템 삭제 처리 스케줄러 (용량 제한 대응)
-        async function cleanupOldMessages(messages) {
-            if (messages.length === 0) return;
-
-            const now = Date.now();
-            const fifteenMinutesMs = 15 * 60 * 1000;
-            const expiredDocs = [];
-
-            messages.forEach((msg) => {
-                if (msg.createdAt) {
-                    const createdTime = msg.createdAt.toDate ? msg.createdAt.toDate().getTime() : new Date(msg.createdAt).getTime();
-                    if (now - createdTime > fifteenMinutesMs) {
-                        expiredDocs.push(msg);
-                    }
-                }
-            });
-
-            if (expiredDocs.length > 0) {
-                let deletedCount = 0;
-                for (const docToDel of expiredDocs) {
-                    try {
-                        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'chats', docToDel.id);
-                        await deleteDoc(docRef);
-                        deletedCount++;
-                    } catch (e) {
-                        console.error("Cleanup deletion error:", e);
-                    }
-                }
-
-                // 중복 알림 등록 방지 (30초 쿨다운)
-                if (deletedCount > 0) {
-                    const lastClearedMsg = messages.find(m => m.isSystem && m.text === "All chats have been cleared.");
-                    let shouldPostSystemMsg = true;
-
-                    if (lastClearedMsg && lastClearedMsg.createdAt) {
-                        const lastTime = lastClearedMsg.createdAt.toDate ? lastClearedMsg.createdAt.toDate().getTime() : new Date(lastClearedMsg.createdAt).getTime();
-                        if (now - lastTime < 30000) {
-                            shouldPostSystemMsg = false;
-                        }
-                    }
-
-                    if (shouldPostSystemMsg) {
-                        try {
-                            const chatColRef = collection(db, 'artifacts', appId, 'public', 'data', 'chats');
-                            await addDoc(chatColRef, {
-                                text: "All chats have been cleared.",
-                                isSystem: true,
-                                senderName: "SYSTEM",
-                                senderUid: "system-cleaner",
-                                createdAt: serverTimestamp()
-                            });
-                        } catch (e) {
-                            console.error("Failed to post system cleaning message:", e);
-                        }
-                    }
-                }
-            }
-        }
-
-        // Periodically ping online status
-        async function updatePresenceHeartbeat() {
-            if (!currentUser) return;
-            try {
-                const publicUserRef = doc(db, 'artifacts', appId, 'public', 'data', 'onlineUsers', currentUser.uid);
-                await setDoc(publicUserRef, {
-                    nickname: userData.nickname || 'Unknown Gamer',
-                    avatar: userData.avatar || 'fa-ghost',
-                    uid: currentUser.uid,
-                    lastActive: serverTimestamp(),
-                    status: 'online'
-                }, { merge: true });
-            } catch(e) {
-                console.warn("Heartbeat update missed:", e);
-            }
-            setTimeout(updatePresenceHeartbeat, 120000);
-        }
-
-        // HTML safe escaping to prevent XSS injection
-        function escapeHtml(text) {
-            const map = {
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#039;'
-            };
-            return text ? text.replace(/[&<>"']/g, function(m) { return map[m]; }) : '';
-        }
-
-        // Render chat messages inside UI (SYSTEM 메시지 템플릿 포함)
-        function renderChatMessages(messages) {
-            chatMessages.innerHTML = '';
-            
-            if (messages.length === 0) {
-                chatMessages.innerHTML = `
-                    <div class="flex flex-col items-center justify-center h-full text-gray-500">
-                        <i class="fa-solid fa-comments text-4xl mb-2 text-gray-700"></i>
-                        <p class="text-sm font-medium">채팅방이 비어있습니다.</p>
-                        <p class="text-xs">첫 대화를 나누며 수유 유저들과 소통을 시작해 보세요!</p>
-                    </div>
-                `;
-                return;
-            }
-
-            messages.forEach((msg) => {
-                // SYSTEM 자동 정리 메시지 렌더링
-                if (msg.isSystem && msg.text === "All chats have been cleared.") {
-                    chatMessages.innerHTML += `
-                        <div class="flex justify-center my-3 animate-pulse">
-                            <div class="bg-purple-950/40 border border-purple-500/30 text-purple-300 rounded-xl px-4 py-2 text-xs flex items-center gap-2">
-                                <i class="fa-solid fa-robot"></i>
-                                <span class="font-medium tracking-wide">SYSTEM: All chats have been cleared.</span>
-                            </div>
-                        </div>
-                    `;
-                    return;
-                }
-
-                const isMyMessage = msg.senderUid === currentUser.uid;
-                const escText = escapeHtml(msg.text);
-                const escName = escapeHtml(msg.senderName);
-                const escAvatar = escapeHtml(msg.senderAvatar || 'fa-ghost');
-                
-                let timeStr = "오후";
-                if (msg.createdAt) {
-                    const d = msg.createdAt.toDate ? msg.createdAt.toDate() : new Date(msg.createdAt);
-                    timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                }
-
-                const msgHtml = isMyMessage ? `
-                    <div class="flex items-end justify-end gap-2.5">
-                        <span class="text-[10px] text-gray-500 mb-1">${timeStr}</span>
-                        <div class="flex flex-col gap-1 max-w-[75%]">
-                            <div class="bg-gradient-to-tr from-purple-600 to-indigo-600 text-white rounded-2xl rounded-tr-none px-4 py-2.5 text-sm shadow-md break-all">
-                                ${escText}
-                            </div>
-                        </div>
-                    </div>
-                ` : `
-                    <div class="flex gap-3">
-                        <div class="h-10 w-10 flex-shrink-0 rounded-xl bg-gray-800 border border-gray-700 flex items-center justify-center text-purple-400 text-base shadow-sm">
-                            <i class="fa-solid ${escAvatar}"></i>
-                        </div>
-                        <div class="flex flex-col gap-1 max-w-[75%]">
-                            <span class="text-xs font-bold text-gray-400">${escName} <span class="text-[9px] font-normal text-purple-400 ml-1">UID: ${msg.senderUid}</span></span>
-                            <div class="flex items-end gap-2.5">
-                                <div class="bg-gray-800 text-gray-100 rounded-2xl rounded-tl-none px-4 py-2.5 text-sm border border-gray-700/80 shadow-md break-all">
-                                    ${escText}
-                                </div>
-                                <span class="text-[10px] text-gray-500 mb-1">${timeStr}</span>
-                            </div>
-                        </div>
-                    </div>
-                `;
-
-                chatMessages.innerHTML += msgHtml;
-            });
-
-            // Auto-scroll Down
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-
-        // Render Online Users List
-        function renderOnlineUsers(users) {
-            usersList.innerHTML = '';
-            onlineCount.innerText = users.length;
-            activeUserCounter.innerText = `누적: ${users.length}명`;
-
-            if (users.length === 0) {
-                usersList.innerHTML = `<p class="text-xs text-gray-500 text-center py-4 w-full">접속자가 없습니다.</p>`;
-                return;
-            }
-
-            users.forEach((u) => {
-                const escName = escapeHtml(u.nickname);
-                const escAvatar = escapeHtml(u.avatar || 'fa-ghost');
-                const isMe = u.uid === currentUser.uid;
-
-                const userHtml = `
-                    <div class="flex items-center gap-2.5 p-2 rounded-xl bg-gray-800/40 hover:bg-gray-800 border border-transparent hover:border-gray-700/50 transition flex-shrink-0 md:flex-shrink">
-                        <div class="relative">
-                            <div class="h-8 w-8 rounded-lg bg-gray-700/60 border border-gray-600 flex items-center justify-center text-purple-300 text-sm">
-                                <i class="fa-solid ${escAvatar}"></i>
-                            </div>
-                            <span class="absolute bottom-[-2px] right-[-2px] h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-gray-900"></span>
-                        </div>
-                        <div class="text-left">
-                            <p class="text-xs font-bold text-gray-200 truncate max-w-[100px] sm:max-w-[140px]">${escName} ${isMe ? '<span class="text-[9px] text-pink-400 font-normal ml-0.5">(나)</span>' : ''}</p>
-                            <p class="text-[9px] text-gray-500 truncate max-w-[100px] sm:max-w-[140px]">UID: ${u.uid}</p>
-                        </div>
-                    </div>
-                `;
-                usersList.innerHTML += userHtml;
-            });
-        }
-
-        // Send Message
-        chatForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            if (!currentUser) {
-                showToast("인증 세션이 만료되었습니다.", "error");
-                return;
-            }
-
-            const text = chatInput.value.trim();
-            if (!text) return;
-
-            chatInput.value = '';
-
-            try {
-                const chatColRef = collection(db, 'artifacts', appId, 'public', 'data', 'chats');
-                await addDoc(chatColRef, {
-                    text: text,
-                    senderName: userData.nickname || 'Unknown Gamer',
-                    senderAvatar: userData.avatar || 'fa-ghost',
-                    senderUid: currentUser.uid,
-                    createdAt: serverTimestamp()
-                });
-            } catch (err) {
-                console.error("Message send failure:", err);
-                showToast("실시간 채팅 전송에 실패했습니다.", "error");
-            }
-        });
-
-        // Start Core Flows
-        initAuth();
-    </script>
+    // 시작 지점 실행
+    initApp();
+  </script>
 </body>
 </html>
